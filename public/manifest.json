@@ -1,0 +1,92 @@
+{
+  "name": "CompaStock - Sistema de Inventarios",
+  "short_name": "CompaStock",
+  "description": "Sistema PWA para gestión de inventarios y pedidos en restaurantes",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#2196F3",
+  "background_color": "#ffffff",
+  "lang": "es-MX",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    {
+      "src": "icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Crear Pedido",
+      "short_name": "Pedido",
+      "description": "Crear nuevo pedido semanal",
+      "url": "/?action=create-order",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Pedido Urgente",
+      "short_name": "Urgente",
+      "description": "Crear pedido urgente",
+      "url": "/?action=urgent-order",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard Surtidor",
+      "short_name": "Surtidor",
+      "description": "Ver pedidos pendientes",
+      "url": "/?action=supplier-dashboard",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "screenshots": [
+    {
+      "src": "screenshots/desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "platform": "wide",
+      "label": "Dashboard principal de CompaStock"
+    },
+    {
+      "src": "screenshots/mobile-1.png",
+      "sizes": "360x640",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Vista móvil de pedidos"
+    }
+  ],
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
+}

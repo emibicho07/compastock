@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#2196F3" />
+    
+    <!-- PWA: Meta tags esenciales -->
+    <meta name="description" content="CompaStock - Sistema PWA para gestión de inventarios y pedidos en restaurantes" />
+    <meta name="keywords" content="inventarios, restaurantes, pedidos, PWA, gestión" />
+    <meta name="author" content="CompaStock Team" />
+    
+    <!-- PWA: Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192x192.png" />
+    
+    <!-- PWA: Manifest -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    
+    <!-- PWA: iOS específico -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="CompaStock" />
+    
+    <!-- PWA: iOS Splash Screens -->
+    <link rel="apple-touch-startup-image" 
+          media="screen and (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)" 
+          href="%PUBLIC_URL%/splash/iphone-xr.png" />
+    <link rel="apple-touch-startup-image" 
+          media="screen and (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" 
+          href="%PUBLIC_URL%/splash/iphone-x.png" />
+    <link rel="apple-touch-startup-image" 
+          media="screen and (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)" 
+          href="%PUBLIC_URL%/splash/iphone-plus.png" />
+    <link rel="apple-touch-startup-image" 
+          media="screen and (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" 
+          href="%PUBLIC_URL%/splash/iphone.png" />
+    
+    <!-- PWA: Android -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="msapplication-TileColor" content="#2196F3" />
+    <meta name="msapplication-TileImage" content="%PUBLIC_URL%/icons/icon-144x144.png" />
+    
+    <!-- PWA: Open Graph para compartir -->
+    <meta property="og:title" content="CompaStock - Sistema de Inventarios" />
+    <meta property="og:description" content="Gestiona inventarios y pedidos de restaurantes de forma eficiente" />
+    <meta property="og:image" content="%PUBLIC_URL%/icons/icon-512x512.png" />
+    <meta property="og:url" content="https://compastock.com" />
+    <meta property="og:type" content="website" />
+    
+    <!-- PWA: Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CompaStock - Sistema de Inventarios" />
+    <meta name="twitter:description" content="Gestiona inventarios y pedidos de restaurantes de forma eficiente" />
+    <meta name="twitter:image" content="%PUBLIC_URL%/icons/icon-512x512.png" />
+    
+    <!-- PWA: Preload crítico -->
+    <link rel="preload" href="%PUBLIC_URL%/static/css/main.css" as="style" />
+    <link rel="preload" href="%PUBLIC_URL%/static/js/bundle.js" as="script" />
+    
+    <title>CompaStock - Sistema de Inventarios</title>
+    
+    <style>
+      /* PWA: Loading inicial optimizado */
+      #root {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      }
+      
+      .initial-loading {
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      
+      .initial-loading h1 {
+        color: #2196F3;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        font-weight: 700;
+      }
+      
+      .initial-loading .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #2196F3;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+      
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      
+      .initial-loading p {
+        color: #666;
+        font-size: 1.1rem;
+      }
+      
+      /* PWA: Ocultar cuando React carga */
+      #root:not(:empty) .initial-loading {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>
+      <div style="text-align: center; padding: 2rem; font-family: Arial, sans-serif;">
+        <h1>🚨 JavaScript Requerido</h1>
+        <p>CompaStock necesita JavaScript habilitado para funcionar.</p>
+        <p>Por favor, habilita JavaScript en tu navegador e intenta nuevamente.</p>
+      </div>
+    </noscript>
+    
+    <div id="root">
+      <!-- PWA: Loading inicial mientras carga React -->
+      <div class="initial-loading">
+        <h1>📦 CompaStock</h1>
+        <div class="spinner"></div>
+        <p>Cargando sistema de inventarios...</p>
+      </div>
+    </div>
+    
+    <!-- PWA: Registro de Service Worker -->
+    <script>
+      // Registro del Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registrado exitosamente:', registration.scope);
+              
+              // Verificar actualizaciones cada 30 minutos
+              setInterval(() => {
+                registration.update();
+              }, 30 * 60 * 1000);
+            })
+            .catch((error) => {
+              console.log('Error al registrar SW:', error);
+            });
+        });
+      }
+      
+      // PWA: Prevenir zoom con doble tap en iOS
+      let lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+      
+      // PWA: Manejar cambios de orientación
+      window.addEventListener('orientationchange', () => {
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+        }, 100);
+      });
+      
+      // PWA: Detectar modo standalone
+      if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches) {
+        document.body.classList.add('pwa-standalone');
+        console.log('CompaStock ejecutándose como PWA');
+      }
+      
+      // PWA: Performance monitoring
+      window.addEventListener('load', () => {
+        if ('performance' in window) {
+          const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+          console.log(`CompaStock cargado en ${loadTime}ms`);
+        }
+      });
+    </script>
+  </body>
+</html>
