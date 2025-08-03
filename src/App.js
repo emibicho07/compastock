@@ -21,10 +21,27 @@ function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        try {
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      try {
+        // Buscar usuario por email en lugar de UID
+        const q = query(
+          collection(db, 'users'),
+          where('email', '==', firebaseUser.email)
+        );
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          const userDoc = querySnapshot.docs[0];
+          setUser({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            id: userDoc.id,
+            ...userDoc.data()
+          });
+        } else {
+          // Fallback al método original
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             setUser({
@@ -33,17 +50,18 @@ function App() {
               ...userDoc.data()
             });
           }
-        } catch (error) {
-          console.error('Error al obtener datos del usuario:', error);
         }
-      } else {
-        setUser(null);
+      } catch (error) {
+        console.error('Error al obtener datos del usuario:', error);
       }
-      setLoading(false);
-    });
+    } else {
+      setUser(null);
+    }
+    setLoading(false);
+  });
 
-    return () => unsubscribe();
-  }, []);
+  return () => unsubscribe();
+}, []);
 
   // PWA: Verificar conexión
   useEffect(() => {
