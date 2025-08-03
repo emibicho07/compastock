@@ -9,6 +9,7 @@ import SupplierDashboard from './SupplierDashboard';
 import AdminOverview from './AdminOverview';
 import UserManagement from './UserManagement';
 import OrganizationSettings from './OrganizationSettings';
+import ProviderManagement from './ProviderManagement'; // NUEVO IMPORT
 import './App.css';
 
 function App() {
@@ -207,6 +208,11 @@ function App() {
       return <OrganizationSettings user={user} onBack={() => setCurrentView('dashboard')} />;
     }
 
+    // NUEVA RUTA PARA GESTIÓN DE PROVEEDORES
+    if (currentView === 'provider-management') {
+      return <ProviderManagement user={user} onBack={() => setCurrentView('dashboard')} />;
+    }
+
     // Dashboard por defecto
     switch (user?.role) {
       case 'restaurante':
@@ -276,6 +282,13 @@ function App() {
               >
                 ✅ Marcar Entregas
               </button>
+              {/* NUEVO BOTÓN PARA SURTIDORES */}
+              <button 
+                className="dashboard-button"
+                onClick={() => handleNavigation('provider-management')}
+              >
+                🏪 Gestionar Proveedores
+              </button>
             </div>
           </div>
         );
@@ -304,6 +317,13 @@ function App() {
                 onClick={() => handleNavigation('user-management')}
               >
                 👥 Gestionar Usuarios
+              </button>
+              {/* NUEVO BOTÓN PARA ADMINS */}
+              <button 
+                className="dashboard-button"
+                onClick={() => handleNavigation('provider-management')}
+              >
+                🏪 Gestionar Proveedores
               </button>
               <button 
                 className="dashboard-button"
