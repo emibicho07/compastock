@@ -1,3 +1,9 @@
+useEffect(() => {
+  console.log('🔍 DEBUG USER COMPLETO:', user);
+  console.log('🔍 organizationId:', user?.organizationId);
+  console.log('🔍 user keys:', user ? Object.keys(user) : 'user is null');
+  loadProviders();
+}, []);
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
