@@ -39,11 +39,12 @@ function ProductManagement({ user, onBack }) {
       console.log('Usuario completo en productos:', user);
       console.log('OrganizationId en productos:', user?.organizationId);
 
-      // Verificación más flexible con fallbacks
-      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
+      // Verificación usando la estructura real del usuario
+      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
 
       if (!orgId) {
         console.error('Usuario sin organizationId válido en loadProviders. Propiedades disponibles:', Object.keys(user || {}));
+        console.error('Objeto restaurant:', user?.restaurant);
         setLoadingProviders(false);
         return;
       }
@@ -73,11 +74,12 @@ function ProductManagement({ user, onBack }) {
 
   const loadProducts = async () => {
     try {
-      // Verificación más flexible con fallbacks
-      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
+      // Verificación usando la estructura real del usuario
+      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
 
       if (!orgId) {
         console.error('Usuario sin organizationId válido en loadProducts. Propiedades disponibles:', Object.keys(user || {}));
+        console.error('Objeto restaurant:', user?.restaurant);
         setLoading(false);
         return;
       }
@@ -105,13 +107,14 @@ function ProductManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      // Obtener organizationId con fallbacks
-      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
-      const orgName = user?.organizationName || user?.organization?.name || user?.orgName || 'Organización';
+      // Obtener organizationId usando la estructura real
+      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
+      const orgName = user?.restaurant?.name || user?.organizationName || 'Organización';
 
       if (!orgId) {
         alert('❌ Error: No se pudo obtener información de la organización');
         console.error('Datos de usuario disponibles en submit:', Object.keys(user || {}));
+        console.error('Objeto restaurant:', user?.restaurant);
         setLoading(false);
         return;
       }
@@ -199,8 +202,8 @@ function ProductManagement({ user, onBack }) {
     );
   }
 
-  // Obtener datos de organización con fallbacks
-  const orgName = user?.organizationName || user?.organization?.name || user?.orgName || 'Tu Organización';
+  // Obtener datos de organización usando la estructura real
+  const orgName = user?.restaurant?.name || user?.organizationName || 'Tu Organización';
 
   return (
     <div className="product-management">

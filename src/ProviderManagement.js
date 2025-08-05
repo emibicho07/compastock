@@ -31,11 +31,12 @@ function ProviderManagement({ user, onBack }) {
       console.log('OrganizationId:', user?.organizationId);
       console.log('Tipo de organizationId:', typeof user?.organizationId);
 
-      // Verificación más flexible - permite string vacío pero no null/undefined
-      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
+      // Verificación usando la estructura real del usuario
+      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
       
       if (!orgId) {
         console.error('Usuario sin organizationId válido. Propiedades disponibles:', Object.keys(user || {}));
+        console.error('Objeto restaurant:', user?.restaurant);
         setLoading(false);
         return;
       }
@@ -70,13 +71,14 @@ function ProviderManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      // Obtener organizationId con fallbacks
-      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
-      const orgName = user?.organizationName || user?.organization?.name || user?.orgName || 'Organización';
+      // Obtener organizationId usando la estructura real
+      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
+      const orgName = user?.restaurant?.name || user?.organizationName || 'Organización';
 
       if (!orgId) {
         alert('❌ Error: No se pudo obtener información de la organización');
         console.error('Datos de usuario disponibles:', Object.keys(user || {}));
+        console.error('Objeto restaurant:', user?.restaurant);
         setLoading(false);
         return;
       }
@@ -213,8 +215,8 @@ function ProviderManagement({ user, onBack }) {
     );
   }
 
-  // Obtener datos de organización con fallbacks
-  const orgName = user?.organizationName || user?.organization?.name || user?.orgName || 'Tu Organización';
+  // Obtener datos de organización usando la estructura real
+  const orgName = user?.restaurant?.name || user?.organizationName || 'Tu Organización';
   const userRole = user?.role || 'restaurante';
 
   return (
