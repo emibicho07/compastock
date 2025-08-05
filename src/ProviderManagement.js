@@ -3,30 +3,6 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } 
 import { db } from './firebase';
 import './ProviderManagement.css';
 
-// Helper para cargar datos completos del usuario
-const loadCompleteUserData = async (userEmail, organizationId) => {
-  try {
-    if (organizationId && organizationId !== 'undefined') {
-      return organizationId;
-    }
-    
-    const q = query(
-      collection(db, 'users'),
-      where('email', '==', userEmail)
-    );
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const userData = querySnapshot.docs[0].data();
-      return userData.organizationId;
-    }
-  } catch (error) {
-    console.error('Error cargando datos de usuario:', error);
-  }
-  
-  return 'pizzas-monterrey'; // Fallback
-};
-
 function ProviderManagement({ user, onBack }) {
   const [providers, setProviders] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -50,15 +26,15 @@ function ProviderManagement({ user, onBack }) {
 
   const loadProviders = async () => {
     try {
-      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
-      
-      if (!realOrgId) {
-        realOrgId = 'pizzas-monterrey';
+      if (!user.organizationId) {
+        console.error('Usuario sin organizationId válido');
+        setLoading(false);
+        return;
       }
 
       const q = query(
         collection(db, 'providers'), 
-        where('organizationId', '==', realOrgId)
+        where('organizationId', '==', user.organizationId)
       );
       const querySnapshot = await getDocs(q);
       
@@ -86,16 +62,16 @@ function ProviderManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
-
-      if (!realOrgId) {
-        realOrgId = 'pizzas-monterrey';
+      if (!user.organizationId) {
+        alert('❌ Error: No se pudo obtener información de la organización');
+        setLoading(false);
+        return;
       }
 
       const providerData = {
         ...formData,
-        organizationId: realOrgId,
-        organizationName: user.organizationName || 'Pizzas Monterrey',
+        organizationId: user.organizationId,
+        organizationName: user.organizationName,
         updatedAt: new Date().toISOString(),
         updatedBy: user.name
       };

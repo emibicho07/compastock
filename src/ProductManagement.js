@@ -3,33 +3,9 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } 
 import { db } from './firebase';
 import './ProductManagement.css';
 
-// Helper para cargar datos completos del usuario
-const loadCompleteUserData = async (userEmail, organizationId) => {
-  try {
-    if (organizationId && organizationId !== 'undefined') {
-      return organizationId;
-    }
-    
-    const q = query(
-      collection(db, 'users'),
-      where('email', '==', userEmail)
-    );
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const userData = querySnapshot.docs[0].data();
-      return userData.organizationId;
-    }
-  } catch (error) {
-    console.error('Error cargando datos de usuario:', error);
-  }
-  
-  return 'pizzas-monterrey'; // Fallback
-};
-
 function ProductManagement({ user, onBack }) {
   const [products, setProducts] = useState([]);
-  const [providers, setProviders] = useState([]); // DINÁMICO AHORA
+  const [providers, setProviders] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -54,22 +30,21 @@ function ProductManagement({ user, onBack }) {
 
   useEffect(() => {
     loadProducts();
-    loadProviders(); // CARGAR PROVEEDORES DINÁMICAMENTE
+    loadProviders();
   }, []);
 
-  // NUEVA FUNCIÓN: Cargar proveedores desde Firebase
   const loadProviders = async () => {
     try {
-      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
-      
-      if (!realOrgId) {
-        realOrgId = 'pizzas-monterrey';
+      if (!user.organizationId) {
+        console.error('Usuario sin organizationId válido');
+        setLoadingProviders(false);
+        return;
       }
 
       const q = query(
         collection(db, 'providers'),
-        where('organizationId', '==', realOrgId),
-        where('active', '==', true) // Solo proveedores activos
+        where('organizationId', '==', user.organizationId),
+        where('active', '==', true)
       );
       const querySnapshot = await getDocs(q);
       
@@ -84,13 +59,6 @@ function ProductManagement({ user, onBack }) {
       
     } catch (error) {
       console.error('Error al cargar proveedores:', error);
-      // Fallback a proveedores hardcodeados si falla
-      setProviders([
-        { name: 'Walmart' },
-        { name: 'Sam\'s Club' },
-        { name: 'Restaurant Depot' },
-        { name: 'Mercado Local' }
-      ]);
     } finally {
       setLoadingProviders(false);
     }
@@ -98,16 +66,15 @@ function ProductManagement({ user, onBack }) {
 
   const loadProducts = async () => {
     try {
-      // Obtener organizationId real del usuario
-      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
-      
-      if (!realOrgId) {
-        realOrgId = 'pizzas-monterrey'; // Fallback directo
+      if (!user.organizationId) {
+        console.error('Usuario sin organizationId válido');
+        setLoading(false);
+        return;
       }
 
       const q = query(
         collection(db, 'products'), 
-        where('organizationId', '==', realOrgId)
+        where('organizationId', '==', user.organizationId)
       );
       const querySnapshot = await getDocs(q);
       
@@ -128,17 +95,16 @@ function ProductManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      // Obtener organizationId real del usuario
-      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
-      
-      if (!realOrgId) {
-        realOrgId = 'pizzas-monterrey'; // Fallback directo
+      if (!user.organizationId) {
+        alert('❌ Error: No se pudo obtener información de la organización');
+        setLoading(false);
+        return;
       }
 
       const productData = {
         ...formData,
-        organizationId: realOrgId, // Usar organizationId real o fallback
-        organizationName: user.organizationName || 'Pizzas Monterrey',
+        organizationId: user.organizationId,
+        organizationName: user.organizationName,
         updatedAt: new Date().toISOString()
       };
 
@@ -270,7 +236,7 @@ function ProductManagement({ user, onBack }) {
                   {loadingProviders ? 'Cargando proveedores...' : 'Sin proveedor por defecto'}
                 </option>
                 {providers.map(provider => (
-                  <option key={provider.id || provider.name} value={provider.name}>
+                  <option key={provider.id} value={provider.name}>
                     {provider.name}
                   </option>
                 ))}
