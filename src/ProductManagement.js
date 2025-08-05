@@ -3,6 +3,30 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } 
 import { db } from './firebase';
 import './ProductManagement.css';
 
+// Helper para cargar datos completos del usuario
+const loadCompleteUserData = async (userEmail, organizationId) => {
+  try {
+    if (organizationId && organizationId !== 'undefined') {
+      return organizationId;
+    }
+    
+    const q = query(
+      collection(db, 'users'),
+      where('email', '==', userEmail)
+    );
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const userData = querySnapshot.docs[0].data();
+      return userData.organizationId;
+    }
+  } catch (error) {
+    console.error('Error cargando datos de usuario:', error);
+  }
+  
+  return 'pizzas-monterrey'; // Fallback
+};
+
 function ProductManagement({ user, onBack }) {
   const [products, setProducts] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -37,10 +61,16 @@ function ProductManagement({ user, onBack }) {
 
   const loadProducts = async () => {
     try {
-      // Filtrar productos solo de la organización del usuario y activos
+      // Obtener organizationId real del usuario
+      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
+      
+      if (!realOrgId) {
+        realOrgId = 'pizzas-monterrey'; // Fallback directo
+      }
+
       const q = query(
         collection(db, 'products'), 
-        where('organizationId', '==', user.organizationId)
+        where('organizationId', '==', realOrgId)
       );
       const querySnapshot = await getDocs(q);
       
@@ -61,10 +91,17 @@ function ProductManagement({ user, onBack }) {
     setLoading(true);
 
     try {
+      // Obtener organizationId real del usuario
+      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
+      
+      if (!realOrgId) {
+        realOrgId = 'pizzas-monterrey'; // Fallback directo
+      }
+
       const productData = {
         ...formData,
-        organizationId: user.organizationId, // Asociar con la organización
-        organizationName: user.organizationName,
+        organizationId: realOrgId, // Usar organizationId real o fallback
+        organizationName: user.organizationName || 'Pizzas Monterrey',
         updatedAt: new Date().toISOString()
       };
 
