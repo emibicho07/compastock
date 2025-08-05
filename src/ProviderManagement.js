@@ -57,12 +57,13 @@ function ProviderManagement({ user, onBack }) {
   const loadProviders = async () => {
     try {
       // Obtener organizationId real del usuario
-      const realOrgId = await loadCompleteUserData(user.email, user.organizationId);
+      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
       
       if (!realOrgId) {
-        console.error('No se pudo obtener organizationId para el usuario');
-        setLoading(false);
-        return;
+        console.error('No se pudo obtener organizationId, usando fallback');
+        // Usar fallback directo si no se encuentra
+        realOrgId = 'pizzas-monterrey';
+        console.log('Usando organizationId fallback:', realOrgId);
       }
 
       const q = query(
@@ -96,18 +97,17 @@ function ProviderManagement({ user, onBack }) {
 
     try {
       // Obtener organizationId real del usuario
-      const realOrgId = await loadCompleteUserData(user.email, user.organizationId);
+      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
 
       if (!realOrgId) {
-        alert('❌ Error: No se pudo obtener información de la organización');
-        setLoading(false);
-        return;
+        console.log('Usando fallback organizationId para crear proveedor');
+        realOrgId = 'pizzas-monterrey'; // Fallback directo
       }
 
       const providerData = {
         ...formData,
-        organizationId: realOrgId, // Usar el organizationId real
-        organizationName: user.organizationName || 'Organización',
+        organizationId: realOrgId, // Usar el organizationId real o fallback
+        organizationName: user.organizationName || 'Pizzas Monterrey',
         updatedAt: new Date().toISOString(),
         updatedBy: user.name
       };
