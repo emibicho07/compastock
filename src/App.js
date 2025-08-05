@@ -9,7 +9,7 @@ import SupplierDashboard from './SupplierDashboard';
 import AdminOverview from './AdminOverview';
 import UserManagement from './UserManagement';
 import OrganizationSettings from './OrganizationSettings';
-import ProviderManagement from './ProviderManagement'; // NUEVO IMPORT
+import ProviderManagement from './ProviderManagement';
 import './App.css';
 
 function App() {
@@ -21,47 +21,75 @@ function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-    if (firebaseUser) {
-      try {
-        // Buscar usuario por email en lugar de UID
-        const q = query(
-          collection(db, 'users'),
-          where('email', '==', firebaseUser.email)
-        );
-        const querySnapshot = await getDocs(q);
+  // FUNCIÓN ROBUSTA PARA CARGAR USUARIO COMPLETO
+  const loadCompleteUserData = async (firebaseUser) => {
+    try {
+      // Intentar buscar por email en la colección users
+      const emailQuery = query(
+        collection(db, 'users'),
+        where('email', '==', firebaseUser.email)
+      );
+      const emailSnapshot = await getDocs(emailQuery);
+      
+      if (!emailSnapshot.empty) {
+        // Usuario encontrado por email - datos completos
+        const userDoc = emailSnapshot.docs[0];
+        const userData = userDoc.data();
         
-        if (!querySnapshot.empty) {
-          const userDoc = querySnapshot.docs[0];
-          setUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            id: userDoc.id,
-            ...userDoc.data()
-          });
-        } else {
-          // Fallback al método original
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            setUser({
-              uid: firebaseUser.uid,
-              email: firebaseUser.email,
-              ...userDoc.data()
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error al obtener datos del usuario:', error);
+        return {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          firestoreId: userDoc.id,
+          ...userData
+        };
       }
-    } else {
-      setUser(null);
+      
+      // Fallback: buscar por UID (método original)
+      const uidDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      if (uidDoc.exists()) {
+        return {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          firestoreId: uidDoc.id,
+          ...uidDoc.data()
+        };
+      }
+      
+      // Si no se encuentra de ninguna manera
+      console.error('Usuario no encontrado en Firestore');
+      return null;
+      
+    } catch (error) {
+      console.error('Error cargando datos completos del usuario:', error);
+      return null;
     }
-    setLoading(false);
-  });
+  };
 
-  return () => unsubscribe();
-}, []);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const completeUserData = await loadCompleteUserData(firebaseUser);
+          if (completeUserData) {
+            setUser(completeUserData);
+          } else {
+            // Si no se pueden cargar los datos, cerrar sesión
+            await signOut(auth);
+            setUser(null);
+            alert('Error al cargar datos del usuario. Por favor, inicia sesión nuevamente.');
+          }
+        } catch (error) {
+          console.error('Error en autenticación:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // PWA: Verificar conexión
   useEffect(() => {
@@ -226,7 +254,6 @@ useEffect(() => {
       return <OrganizationSettings user={user} onBack={() => setCurrentView('dashboard')} />;
     }
 
-    // NUEVA RUTA PARA GESTIÓN DE PROVEEDORES
     if (currentView === 'provider-management') {
       return <ProviderManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
@@ -300,7 +327,6 @@ useEffect(() => {
               >
                 ✅ Marcar Entregas
               </button>
-              {/* NUEVO BOTÓN PARA SURTIDORES */}
               <button 
                 className="dashboard-button"
                 onClick={() => handleNavigation('provider-management')}
@@ -336,7 +362,6 @@ useEffect(() => {
               >
                 👥 Gestionar Usuarios
               </button>
-              {/* NUEVO BOTÓN PARA ADMINS */}
               <button 
                 className="dashboard-button"
                 onClick={() => handleNavigation('provider-management')}
