@@ -29,9 +29,11 @@ const loadCompleteUserData = async (userEmail, organizationId) => {
 
 function ProductManagement({ user, onBack }) {
   const [products, setProducts] = useState([]);
+  const [providers, setProviders] = useState([]); // DINÁMICO AHORA
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProviders, setLoadingProviders] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     unit: '',
@@ -45,11 +47,6 @@ function ProductManagement({ user, onBack }) {
     'Limpieza', 'Panadería', 'Congelados', 'Condimentos', 'Otros'
   ];
 
-  const providers = [
-    'Walmart', 'Sam\'s Club', 'Restaurant Depot', 
-    'Mercado Local', 'Proveedor A', 'Proveedor B'
-  ];
-
   const units = [
     'kg', 'gr', 'litro', 'ml', 'pieza', 'paquete', 
     'caja', 'bolsa', 'lata', 'botella'
@@ -57,7 +54,47 @@ function ProductManagement({ user, onBack }) {
 
   useEffect(() => {
     loadProducts();
+    loadProviders(); // CARGAR PROVEEDORES DINÁMICAMENTE
   }, []);
+
+  // NUEVA FUNCIÓN: Cargar proveedores desde Firebase
+  const loadProviders = async () => {
+    try {
+      let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
+      
+      if (!realOrgId) {
+        realOrgId = 'pizzas-monterrey';
+      }
+
+      const q = query(
+        collection(db, 'providers'),
+        where('organizationId', '==', realOrgId),
+        where('active', '==', true) // Solo proveedores activos
+      );
+      const querySnapshot = await getDocs(q);
+      
+      const providersData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Ordenar alfabéticamente
+      providersData.sort((a, b) => a.name.localeCompare(b.name));
+      setProviders(providersData);
+      
+    } catch (error) {
+      console.error('Error al cargar proveedores:', error);
+      // Fallback a proveedores hardcodeados si falla
+      setProviders([
+        { name: 'Walmart' },
+        { name: 'Sam\'s Club' },
+        { name: 'Restaurant Depot' },
+        { name: 'Mercado Local' }
+      ]);
+    } finally {
+      setLoadingProviders(false);
+    }
+  };
 
   const loadProducts = async () => {
     try {
@@ -227,12 +264,22 @@ function ProductManagement({ user, onBack }) {
               <select
                 value={formData.defaultProvider}
                 onChange={(e) => setFormData({...formData, defaultProvider: e.target.value})}
+                disabled={loadingProviders}
               >
-                <option value="">Sin proveedor por defecto</option>
+                <option value="">
+                  {loadingProviders ? 'Cargando proveedores...' : 'Sin proveedor por defecto'}
+                </option>
                 {providers.map(provider => (
-                  <option key={provider} value={provider}>{provider}</option>
+                  <option key={provider.id || provider.name} value={provider.name}>
+                    {provider.name}
+                  </option>
                 ))}
               </select>
+              {providers.length === 0 && !loadingProviders && (
+                <small style={{ color: '#666', marginTop: '0.5rem', display: 'block' }}>
+                  No hay proveedores activos. <strong>Agrega proveedores</strong> en "🏪 Gestionar Proveedores"
+                </small>
+              )}
             </div>
 
             <button type="submit" disabled={loading} className="save-button">
