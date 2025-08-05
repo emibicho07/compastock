@@ -26,15 +26,23 @@ function ProviderManagement({ user, onBack }) {
 
   const loadProviders = async () => {
     try {
-      if (!user.organizationId) {
-        console.error('Usuario sin organizationId válido');
+      // Debug: Imprimir el objeto user completo
+      console.log('Usuario completo:', user);
+      console.log('OrganizationId:', user?.organizationId);
+      console.log('Tipo de organizationId:', typeof user?.organizationId);
+
+      // Verificación más flexible - permite string vacío pero no null/undefined
+      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
+      
+      if (!orgId) {
+        console.error('Usuario sin organizationId válido. Propiedades disponibles:', Object.keys(user || {}));
         setLoading(false);
         return;
       }
 
       const q = query(
         collection(db, 'providers'), 
-        where('organizationId', '==', user.organizationId)
+        where('organizationId', '==', orgId)
       );
       const querySnapshot = await getDocs(q);
       
@@ -62,18 +70,23 @@ function ProviderManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      if (!user.organizationId) {
+      // Obtener organizationId con fallbacks
+      const orgId = user?.organizationId || user?.organization?.id || user?.orgId;
+      const orgName = user?.organizationName || user?.organization?.name || user?.orgName || 'Organización';
+
+      if (!orgId) {
         alert('❌ Error: No se pudo obtener información de la organización');
+        console.error('Datos de usuario disponibles:', Object.keys(user || {}));
         setLoading(false);
         return;
       }
 
       const providerData = {
         ...formData,
-        organizationId: user.organizationId,
-        organizationName: user.organizationName,
+        organizationId: orgId,
+        organizationName: orgName,
         updatedAt: new Date().toISOString(),
-        updatedBy: user.name
+        updatedBy: user?.name || user?.displayName || 'Usuario'
       };
 
       if (editingProvider) {
@@ -83,7 +96,7 @@ function ProviderManagement({ user, onBack }) {
         await addDoc(collection(db, 'providers'), {
           ...providerData,
           createdAt: new Date().toISOString(),
-          createdBy: user.name
+          createdBy: user?.name || user?.displayName || 'Usuario'
         });
         alert('✅ Proveedor creado exitosamente');
       }
@@ -102,7 +115,8 @@ function ProviderManagement({ user, onBack }) {
   };
 
   const handleEdit = (provider) => {
-    if (user.role !== 'admin' && user.role !== 'surtidor') {
+    const userRole = user?.role || 'restaurante';
+    if (userRole !== 'admin' && userRole !== 'surtidor') {
       alert('❌ No tienes permisos para editar proveedores');
       return;
     }
@@ -118,7 +132,8 @@ function ProviderManagement({ user, onBack }) {
   };
 
   const handleDelete = async (provider) => {
-    if (user.role !== 'admin') {
+    const userRole = user?.role || 'restaurante';
+    if (userRole !== 'admin') {
       alert('❌ Solo los administradores pueden eliminar proveedores');
       return;
     }
@@ -136,7 +151,8 @@ function ProviderManagement({ user, onBack }) {
   };
 
   const handleToggleActive = async (provider) => {
-    if (user.role !== 'admin' && user.role !== 'surtidor') {
+    const userRole = user?.role || 'restaurante';
+    if (userRole !== 'admin' && userRole !== 'surtidor') {
       alert('❌ No tienes permisos para cambiar el estado de proveedores');
       return;
     }
@@ -145,7 +161,7 @@ function ProviderManagement({ user, onBack }) {
       await updateDoc(doc(db, 'providers', provider.id), {
         active: !provider.active,
         updatedAt: new Date().toISOString(),
-        updatedBy: user.name
+        updatedBy: user?.name || user?.displayName || 'Usuario'
       });
       await loadProviders();
     } catch (error) {
@@ -164,15 +180,18 @@ function ProviderManagement({ user, onBack }) {
   };
 
   const canCreateProviders = () => {
-    return user.role === 'admin';
+    const userRole = user?.role || 'restaurante';
+    return userRole === 'admin';
   };
 
   const canEditProviders = () => {
-    return user.role === 'admin' || user.role === 'surtidor';
+    const userRole = user?.role || 'restaurante';
+    return userRole === 'admin' || userRole === 'surtidor';
   };
 
   const canDeleteProviders = () => {
-    return user.role === 'admin';
+    const userRole = user?.role || 'restaurante';
+    return userRole === 'admin';
   };
 
   const formatDate = (dateString) => {
@@ -194,11 +213,15 @@ function ProviderManagement({ user, onBack }) {
     );
   }
 
+  // Obtener datos de organización con fallbacks
+  const orgName = user?.organizationName || user?.organization?.name || user?.orgName || 'Tu Organización';
+  const userRole = user?.role || 'restaurante';
+
   return (
     <div className="provider-management">
       <div className="pm-header">
         <button onClick={onBack} className="back-button">← Volver</button>
-        <h2>🏪 Gestión de Proveedores - {user.organizationName}</h2>
+        <h2>🏪 Gestión de Proveedores - {orgName}</h2>
         {canCreateProviders() && (
           <button 
             onClick={() => setShowForm(!showForm)} 
@@ -212,10 +235,10 @@ function ProviderManagement({ user, onBack }) {
       {/* Información de permisos */}
       <div className="permissions-info">
         <p>
-          <strong>Tu rol:</strong> {user.role === 'admin' ? '👑 Administrador' : user.role === 'surtidor' ? '🚚 Surtidor' : '🍴 Restaurante'}
+          <strong>Tu rol:</strong> {userRole === 'admin' ? '👑 Administrador' : userRole === 'surtidor' ? '🚚 Surtidor' : '🍴 Restaurante'}
         </p>
         <ul>
-          {user.role === 'admin' && (
+          {userRole === 'admin' && (
             <>
               <li>✅ Crear nuevos proveedores</li>
               <li>✅ Editar proveedores existentes</li>
@@ -223,7 +246,7 @@ function ProviderManagement({ user, onBack }) {
               <li>✅ Activar/desactivar proveedores</li>
             </>
           )}
-          {user.role === 'surtidor' && (
+          {userRole === 'surtidor' && (
             <>
               <li>❌ Crear nuevos proveedores (solo admin)</li>
               <li>✅ Editar proveedores existentes</li>
@@ -231,7 +254,7 @@ function ProviderManagement({ user, onBack }) {
               <li>✅ Activar/desactivar proveedores</li>
             </>
           )}
-          {user.role === 'restaurante' && (
+          {userRole === 'restaurante' && (
             <>
               <li>❌ Crear nuevos proveedores (solo admin)</li>
               <li>❌ Editar proveedores (admin/surtidor)</li>
@@ -289,7 +312,7 @@ function ProviderManagement({ user, onBack }) {
       )}
 
       <div className="providers-container">
-        <h3>Proveedores de {user.organizationName} ({providers.length})</h3>
+        <h3>Proveedores de {orgName} ({providers.length})</h3>
 
         {providers.length === 0 ? (
           <div className="empty-state">
