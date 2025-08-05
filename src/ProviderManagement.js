@@ -3,15 +3,13 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } 
 import { db } from './firebase';
 import './ProviderManagement.css';
 
-// Helper para cargar datos completos del usuario - VERSIÓN MEJORADA
+// Helper para cargar datos completos del usuario
 const loadCompleteUserData = async (userEmail, organizationId) => {
   try {
-    // Si ya tiene organizationId, usarlo directamente
     if (organizationId && organizationId !== 'undefined') {
       return organizationId;
     }
     
-    // Buscar por email
     const q = query(
       collection(db, 'users'),
       where('email', '==', userEmail)
@@ -20,17 +18,13 @@ const loadCompleteUserData = async (userEmail, organizationId) => {
     
     if (!querySnapshot.empty) {
       const userData = querySnapshot.docs[0].data();
-      console.log('Datos del usuario encontrados:', userData); // Debug temporal
       return userData.organizationId;
     }
-    
-    console.log('No se encontró usuario con email:', userEmail); // Debug temporal
   } catch (error) {
     console.error('Error cargando datos de usuario:', error);
   }
   
-  // Fallback: usar un organizationId hardcodeado temporalmente
-  return 'pizzas-monterrey'; // TEMPORAL - tu organización
+  return 'pizzas-monterrey'; // Fallback
 };
 
 function ProviderManagement({ user, onBack }) {
@@ -56,14 +50,10 @@ function ProviderManagement({ user, onBack }) {
 
   const loadProviders = async () => {
     try {
-      // Obtener organizationId real del usuario
       let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
       
       if (!realOrgId) {
-        console.error('No se pudo obtener organizationId, usando fallback');
-        // Usar fallback directo si no se encuentra
         realOrgId = 'pizzas-monterrey';
-        console.log('Usando organizationId fallback:', realOrgId);
       }
 
       const q = query(
@@ -96,17 +86,15 @@ function ProviderManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      // Obtener organizationId real del usuario
       let realOrgId = await loadCompleteUserData(user.email, user.organizationId);
 
       if (!realOrgId) {
-        console.log('Usando fallback organizationId para crear proveedor');
-        realOrgId = 'pizzas-monterrey'; // Fallback directo
+        realOrgId = 'pizzas-monterrey';
       }
 
       const providerData = {
         ...formData,
-        organizationId: realOrgId, // Usar el organizationId real o fallback
+        organizationId: realOrgId,
         organizationName: user.organizationName || 'Pizzas Monterrey',
         updatedAt: new Date().toISOString(),
         updatedBy: user.name
