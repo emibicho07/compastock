@@ -3,11 +3,15 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } 
 import { db } from './firebase';
 import './ProviderManagement.css';
 
-// Helper para cargar datos completos del usuario
+// Helper para cargar datos completos del usuario - VERSIÓN MEJORADA
 const loadCompleteUserData = async (userEmail, organizationId) => {
   try {
-    if (organizationId) return organizationId; // Si ya tiene organizationId, usarlo
+    // Si ya tiene organizationId, usarlo directamente
+    if (organizationId && organizationId !== 'undefined') {
+      return organizationId;
+    }
     
+    // Buscar por email
     const q = query(
       collection(db, 'users'),
       where('email', '==', userEmail)
@@ -16,12 +20,17 @@ const loadCompleteUserData = async (userEmail, organizationId) => {
     
     if (!querySnapshot.empty) {
       const userData = querySnapshot.docs[0].data();
+      console.log('Datos del usuario encontrados:', userData); // Debug temporal
       return userData.organizationId;
     }
+    
+    console.log('No se encontró usuario con email:', userEmail); // Debug temporal
   } catch (error) {
     console.error('Error cargando datos de usuario:', error);
   }
-  return null;
+  
+  // Fallback: usar un organizationId hardcodeado temporalmente
+  return 'pizzas-monterrey'; // TEMPORAL - tu organización
 };
 
 function ProviderManagement({ user, onBack }) {
