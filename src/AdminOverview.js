@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { db } from './firebase';
+import { getOrganizationId } from './utils';
 import './AdminOverview.css';
 
 function AdminOverview({ user, onBack }) {
@@ -26,15 +27,18 @@ function AdminOverview({ user, onBack }) {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Cargar datos en paralelo
+      const orgId = getOrganizationId(user);
+      if (!orgId) {
+        console.error('Usuario sin organizationId válido:', user);
+        return;
+      }
+
       const [orders, products, users] = await Promise.all([
-        loadOrders(),
-        loadProducts(),
-        loadUsers()
+        loadOrders(orgId),
+        loadProducts(orgId),
+        loadUsers(orgId)
       ]);
 
-      // Calcular estadísticas
       calculateStats(orders, products, users);
       generateChartData(orders);
       calculateOrdersByStatus(orders);
@@ -48,28 +52,28 @@ function AdminOverview({ user, onBack }) {
     }
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async (orgId) => {
     const q = query(
       collection(db, 'orders'),
-      where('organizationId', '==', user.organizationId)
+      where('organizationId', '==', orgId)
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   };
 
-  const loadProducts = async () => {
+  const loadProducts = async (orgId) => {
     const q = query(
       collection(db, 'products'),
-      where('organizationId', '==', user.organizationId)
+      where('organizationId', '==', orgId)
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async (orgId) => {
     const q = query(
       collection(db, 'users'),
-      where('organizationId', '==', user.organizationId)
+      where('organizationId', '==', orgId)
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));

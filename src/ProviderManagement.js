@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
+import { getOrganizationId } from './utils';
 import './ProviderManagement.css';
 
 function ProviderManagement({ user, onBack }) {
@@ -26,38 +27,25 @@ function ProviderManagement({ user, onBack }) {
 
   const loadProviders = async () => {
     try {
-      // Debug: Imprimir el objeto user completo
-      console.log('Usuario completo:', user);
-      console.log('OrganizationId:', user?.organizationId);
-      console.log('Tipo de organizationId:', typeof user?.organizationId);
-
-      // Verificación usando la estructura real del usuario
-      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
-      
+      const orgId = getOrganizationId(user);
       if (!orgId) {
-        console.error('Usuario sin organizationId válido. Propiedades disponibles:', Object.keys(user || {}));
-        console.error('Objeto restaurant:', user?.restaurant);
+        console.error('Usuario sin organizationId válido. Datos:', user);
         setLoading(false);
         return;
       }
 
       const q = query(
-        collection(db, 'providers'), 
+        collection(db, 'providers'),
         where('organizationId', '==', orgId)
       );
-      const querySnapshot = await getDocs(q);
-      
-      const providersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Ordenar por activos primero, luego por nombre
+      const snapshot = await getDocs(q);
+      const providersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
       providersData.sort((a, b) => {
         if (a.active !== b.active) return b.active - a.active;
         return a.name.localeCompare(b.name);
       });
-      
+
       setProviders(providersData);
     } catch (error) {
       console.error('Error al cargar proveedores:', error);
@@ -71,14 +59,11 @@ function ProviderManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      // Obtener organizationId usando la estructura real
-      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
-      const orgName = user?.restaurant?.name || user?.organizationName || 'Organización';
+      const orgId = getOrganizationId(user);
+      const orgName = user?.organizationName || 'Organización';
 
       if (!orgId) {
         alert('❌ Error: No se pudo obtener información de la organización');
-        console.error('Datos de usuario disponibles:', Object.keys(user || {}));
-        console.error('Objeto restaurant:', user?.restaurant);
         setLoading(false);
         return;
       }
@@ -102,12 +87,11 @@ function ProviderManagement({ user, onBack }) {
         });
         alert('✅ Proveedor creado exitosamente');
       }
-      
+
       await loadProviders();
       setShowForm(false);
       setEditingProvider(null);
       resetForm();
-      
     } catch (error) {
       console.error('Error al guardar proveedor:', error);
       alert('❌ Error al guardar el proveedor');
@@ -115,6 +99,7 @@ function ProviderManagement({ user, onBack }) {
       setLoading(false);
     }
   };
+
 
   const handleEdit = (provider) => {
     const userRole = user?.role || 'restaurante';

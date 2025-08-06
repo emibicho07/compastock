@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
+import { getOrganizationId } from './utils';
 import './RestaurantOrders.css';
 
 function RestaurantOrders({ user, onBack, initialView = 'create', initialUrgent = false }) {
@@ -14,21 +15,10 @@ function RestaurantOrders({ user, onBack, initialView = 'create', initialUrgent 
   const [isUrgent, setIsUrgent] = useState(initialUrgent);
   const [submitting, setSubmitting] = useState(false);
 
-  // Detectar cambios en parámetros iniciales
   useEffect(() => {
     setCurrentView(initialView);
     setIsUrgent(initialUrgent);
   }, [initialView, initialUrgent]);
-
-  const categories = [
-    'Todas', 'Carnes', 'Verduras', 'Lácteos', 'Abarrotes', 'Bebidas', 
-    'Limpieza', 'Panadería', 'Congelados', 'Condimentos', 'Otros'
-  ];
-
-  const providers = [
-    'Walmart', 'Sam\'s Club', 'Restaurant Depot', 
-    'Mercado Local', 'Proveedor A', 'Proveedor B'
-  ];
 
   useEffect(() => {
     loadProducts();
@@ -37,18 +27,20 @@ function RestaurantOrders({ user, onBack, initialView = 'create', initialUrgent 
 
   const loadProducts = async () => {
     try {
-      // Solo productos de la misma organización y activos
+      const orgId = getOrganizationId(user);
+      if (!orgId) {
+        console.error('Usuario sin organizationId válido en loadProducts:', user);
+        setLoading(false);
+        return;
+      }
+
       const q = query(
-        collection(db, 'products'), 
-        where('organizationId', '==', user.organizationId),
+        collection(db, 'products'),
+        where('organizationId', '==', orgId),
         where('active', '==', true)
       );
       const querySnapshot = await getDocs(q);
-      
-      const productsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const productsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProducts(productsData);
     } catch (error) {
       console.error('Error al cargar productos:', error);
@@ -59,19 +51,19 @@ function RestaurantOrders({ user, onBack, initialView = 'create', initialUrgent 
 
   const loadOrders = async () => {
     try {
-      // Solo pedidos del restaurante específico de la misma organización
+      const orgId = getOrganizationId(user);
+      if (!orgId) {
+        console.error('Usuario sin organizationId válido en loadOrders:', user);
+        return;
+      }
+
       const q = query(
-        collection(db, 'orders'), 
+        collection(db, 'orders'),
         where('restaurantId', '==', user.uid),
-        where('organizationId', '==', user.organizationId)
+        where('organizationId', '==', orgId)
       );
       const querySnapshot = await getDocs(q);
-      
-      const ordersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
+      const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       ordersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setOrders(ordersData);
     } catch (error) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, updateDoc, doc } from 'firebase/firestore';
 import { db } from './firebase';
+import { getOrganizationId } from './utils';
 import './SupplierDashboard.css';
 
 function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
@@ -11,7 +12,6 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
   const [urgentOrders, setUrgentOrders] = useState([]);
   const [pendingProducts, setPendingProducts] = useState([]);
 
-  // Detectar cambios en el parámetro inicial
   useEffect(() => {
     setCurrentView(initialView);
   }, [initialView]);
@@ -22,23 +22,24 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
 
   const loadOrders = async () => {
     try {
-      // Solo pedidos de la misma organización que están pendientes
+      const orgId = getOrganizationId(user);
+      if (!orgId) {
+        console.error('Usuario sin organizationId válido en loadOrders:', user);
+        setLoading(false);
+        return;
+      }
+
       const q = query(
-        collection(db, 'orders'), 
-        where('organizationId', '==', user.organizationId),
+        collection(db, 'orders'),
+        where('organizationId', '==', orgId),
         where('status', '==', 'pending')
       );
       const querySnapshot = await getDocs(q);
-      
-      const ordersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const ordersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       setOrders(ordersData);
       groupOrdersByProvider(ordersData);
       filterUrgentOrders(ordersData);
-      
     } catch (error) {
       console.error('Error al cargar pedidos:', error);
     } finally {

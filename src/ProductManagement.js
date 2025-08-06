@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { db } from './firebase';
+import { getOrganizationId } from './utils';
 import './ProductManagement.css';
 
 function ProductManagement({ user, onBack }) {
@@ -35,16 +36,9 @@ function ProductManagement({ user, onBack }) {
 
   const loadProviders = async () => {
     try {
-      // Debug: Imprimir el objeto user completo
-      console.log('Usuario completo en productos:', user);
-      console.log('OrganizationId en productos:', user?.organizationId);
-
-      // Verificación usando la estructura real del usuario
-      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
-
+      const orgId = getOrganizationId(user);
       if (!orgId) {
-        console.error('Usuario sin organizationId válido en loadProviders. Propiedades disponibles:', Object.keys(user || {}));
-        console.error('Objeto restaurant:', user?.restaurant);
+        console.error('Usuario sin organizationId válido en loadProviders:', user);
         setLoadingProviders(false);
         return;
       }
@@ -55,16 +49,10 @@ function ProductManagement({ user, onBack }) {
         where('active', '==', true)
       );
       const querySnapshot = await getDocs(q);
-      
-      const providersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Ordenar alfabéticamente
+
+      const providersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       providersData.sort((a, b) => a.name.localeCompare(b.name));
       setProviders(providersData);
-      
     } catch (error) {
       console.error('Error al cargar proveedores:', error);
     } finally {
@@ -74,26 +62,16 @@ function ProductManagement({ user, onBack }) {
 
   const loadProducts = async () => {
     try {
-      // Verificación usando la estructura real del usuario
-      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
-
+      const orgId = getOrganizationId(user);
       if (!orgId) {
-        console.error('Usuario sin organizationId válido en loadProducts. Propiedades disponibles:', Object.keys(user || {}));
-        console.error('Objeto restaurant:', user?.restaurant);
+        console.error('Usuario sin organizationId válido en loadProducts:', user);
         setLoading(false);
         return;
       }
 
-      const q = query(
-        collection(db, 'products'), 
-        where('organizationId', '==', orgId)
-      );
+      const q = query(collection(db, 'products'), where('organizationId', '==', orgId));
       const querySnapshot = await getDocs(q);
-      
-      const productsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const productsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setProducts(productsData);
     } catch (error) {
       console.error('Error al cargar productos:', error);
@@ -107,14 +85,12 @@ function ProductManagement({ user, onBack }) {
     setLoading(true);
 
     try {
-      // Obtener organizationId usando la estructura real
-      const orgId = user?.restaurant?.id || user?.restaurant || user?.organizationId;
-      const orgName = user?.restaurant?.name || user?.organizationName || 'Organización';
+      const orgId = getOrganizationId(user);
+      const orgName = user?.organizationName || 'Organización';
 
       if (!orgId) {
         alert('❌ Error: No se pudo obtener información de la organización');
-        console.error('Datos de usuario disponibles en submit:', Object.keys(user || {}));
-        console.error('Objeto restaurant:', user?.restaurant);
+        console.error('Usuario:', user);
         setLoading(false);
         return;
       }
@@ -136,17 +112,11 @@ function ProductManagement({ user, onBack }) {
         });
         alert('✅ Producto creado exitosamente');
       }
-      
+
       await loadProducts();
       setShowForm(false);
       setEditingProduct(null);
-      setFormData({
-        name: '',
-        unit: '',
-        category: '',
-        defaultProvider: '',
-        active: true
-      });
+      setFormData({ name: '', unit: '', category: '', defaultProvider: '', active: true });
     } catch (error) {
       console.error('Error al guardar producto:', error);
       alert('❌ Error al guardar el producto');

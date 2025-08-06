@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { getOrganizationId } from './utils';
 import './OrganizationSettings.css';
 
 function OrganizationSettings({ user, onBack }) {
@@ -31,22 +32,22 @@ function OrganizationSettings({ user, onBack }) {
 
   const loadSettings = async () => {
     try {
-      // Intentar cargar configuración existente
-      const settingsDoc = await getDoc(doc(db, 'organizationSettings', user.organizationId));
-      
+      const orgId = getOrganizationId(user);
+      if (!orgId) {
+        console.error('No se encontró organizationId en usuario:', user);
+        return;
+      }
+
+      const settingsDoc = await getDoc(doc(db, 'organizationSettings', orgId));
       if (settingsDoc.exists()) {
         const settingsData = settingsDoc.data();
-        setSettings({
-          ...settings,
-          ...settingsData
-        });
+        setSettings({ ...settings, ...settingsData });
         setOriginalSettings(settingsData);
       } else {
-        // Configuración inicial basada en el usuario
         const initialSettings = {
           ...settings,
           organizationName: user.organizationName,
-          organizationId: user.organizationId,
+          organizationId: orgId,
           contactEmail: user.email
         };
         setSettings(initialSettings);
@@ -63,28 +64,34 @@ function OrganizationSettings({ user, onBack }) {
     e.preventDefault();
     setSaving(true);
 
+    const orgId = getOrganizationId(user);
+    if (!orgId) {
+      console.error('No se encontró organizationId en usuario:', user);
+      alert('❌ No se pudo obtener el ID de la organización');
+      setSaving(false);
+      return;
+    }
+
     try {
-      await updateDoc(doc(db, 'organizationSettings', user.organizationId), {
+      await updateDoc(doc(db, 'organizationSettings', orgId), {
         ...settings,
         updatedAt: new Date().toISOString(),
         updatedBy: user.name
       });
-      
+
       setOriginalSettings(settings);
       alert('✅ Configuración guardada exitosamente');
     } catch (error) {
       console.error('Error al guardar configuración:', error);
-      
-      // Si el documento no existe, crearlo
       try {
-        await setDoc(doc(db, 'organizationSettings', user.organizationId), {
+        await setDoc(doc(db, 'organizationSettings', orgId), {
           ...settings,
           createdAt: new Date().toISOString(),
           createdBy: user.name,
           updatedAt: new Date().toISOString(),
           updatedBy: user.name
         });
-        
+
         setOriginalSettings(settings);
         alert('✅ Configuración creada exitosamente');
       } catch (createError) {

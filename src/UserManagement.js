@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from './firebase';
+import { getOrganizationId } from './utils';
 import './UserManagement.css';
 
 function UserManagement({ user, onBack }) {
@@ -25,18 +26,17 @@ function UserManagement({ user, onBack }) {
 
   const loadUsers = async () => {
     try {
-      const q = query(
-        collection(db, 'users'),
-        where('organizationId', '==', user.organizationId)
-      );
-      const querySnapshot = await getDocs(q);
-      
-      const usersData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      
-      // Ordenar por fecha de creación (más recientes primero)
+      const orgId = getOrganizationId(user);
+      if (!orgId) {
+        console.error('Usuario sin organizationId válido:', user);
+        setLoading(false);
+        return;
+      }
+
+      const q = query(collection(db, 'users'), where('organizationId', '==', orgId));
+      const snapshot = await getDocs(q);
+      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
       usersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setUsers(usersData);
     } catch (error) {
@@ -51,8 +51,16 @@ function UserManagement({ user, onBack }) {
     setSubmitting(true);
 
     try {
+      const orgId = getOrganizationId(user);
+      const orgName = user?.organizationName || 'Organización';
+
+      if (!orgId) {
+        alert('❌ Error: No se pudo obtener información de la organización');
+        setSubmitting(false);
+        return;
+      }
+
       if (editingUser) {
-        // Actualizar usuario existente (sin cambiar contraseña)
         const updateData = {
           name: formData.name,
           email: formData.email,
@@ -65,35 +73,33 @@ function UserManagement({ user, onBack }) {
         await updateDoc(doc(db, 'users', editingUser.id), updateData);
         alert('✅ Usuario actualizado exitosamente');
       } else {
-        // Crear nuevo usuario
         const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
         const newUser = userCredential.user;
-        
-        // Guardar datos adicionales del usuario
+
         const userData = {
           name: formData.name,
           email: formData.email,
           role: formData.role,
           restaurant: formData.role === 'restaurante' ? formData.restaurant : null,
-          organizationId: user.organizationId,
-          organizationName: user.organizationName,
+          organizationId: orgId,
+          organizationName: orgName,
           active: formData.active,
           createdAt: new Date().toISOString(),
           createdBy: user.name
         };
-        
+
         await addDoc(collection(db, 'users'), userData);
         alert('✅ Usuario creado exitosamente');
       }
-      
+
       await loadUsers();
       setShowForm(false);
       setEditingUser(null);
       resetForm();
-      
+
     } catch (error) {
       console.error('Error al guardar usuario:', error);
-      
+
       if (error.code === 'auth/email-already-in-use') {
         alert('❌ Este email ya está registrado');
       } else if (error.code === 'auth/weak-password') {
