@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
 import { db } from './firebase';
-import { getOrganizationId } from './utils';
 import './AdminOverview.css';
+import CodeManager from './CodeManager';
 
 function AdminOverview({ user, onBack }) {
   const [loading, setLoading] = useState(true);
+  const [showCodeManager, setShowCodeManager] = useState(false);
   const [stats, setStats] = useState({
     totalOrders: 0,
     totalProducts: 0,
@@ -27,24 +28,16 @@ function AdminOverview({ user, onBack }) {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const orgId = getOrganizationId(user);
-      if (!orgId) {
-        console.error('Usuario sin organizationId válido:', user);
-        return;
-      }
-
       const [orders, products, users] = await Promise.all([
-        loadOrders(orgId),
-        loadProducts(orgId),
-        loadUsers(orgId)
+        loadOrders(),
+        loadProducts(),
+        loadUsers()
       ]);
-
       calculateStats(orders, products, users);
       generateChartData(orders);
       calculateOrdersByStatus(orders);
       generateRecentActivity(orders);
       calculateTopProducts(orders);
-
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
     } finally {
@@ -52,28 +45,28 @@ function AdminOverview({ user, onBack }) {
     }
   };
 
-  const loadOrders = async (orgId) => {
+  const loadOrders = async () => {
     const q = query(
       collection(db, 'orders'),
-      where('organizationId', '==', orgId)
+      where('organizationId', '==', user.organizationId)
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   };
 
-  const loadProducts = async (orgId) => {
+  const loadProducts = async () => {
     const q = query(
       collection(db, 'products'),
-      where('organizationId', '==', orgId)
+      where('organizationId', '==', user.organizationId)
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   };
 
-  const loadUsers = async (orgId) => {
+  const loadUsers = async () => {
     const q = query(
       collection(db, 'users'),
-      where('organizationId', '==', orgId)
+      where('organizationId', '==', user.organizationId)
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -95,15 +88,13 @@ function AdminOverview({ user, onBack }) {
   };
 
   const generateChartData = (orders) => {
-    // Agrupar pedidos por día de los últimos 7 días
     const last7Days = [];
     const today = new Date();
-    
+
     for (let i = 6; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0];
-      
       const dayOrders = orders.filter(order => {
         const orderDate = new Date(order.createdAt).toISOString().split('T')[0];
         return orderDate === dateStr;
@@ -160,7 +151,6 @@ function AdminOverview({ user, onBack }) {
 
   const calculateTopProducts = (orders) => {
     const productCount = {};
-    
     orders.forEach(order => {
       order.items?.forEach(item => {
         if (productCount[item.productName]) {
@@ -172,7 +162,7 @@ function AdminOverview({ user, onBack }) {
     });
 
     const topProducts = Object.entries(productCount)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([name, quantity]) => ({ name, quantity }));
 
@@ -189,6 +179,10 @@ function AdminOverview({ user, onBack }) {
     return icons[status] || '📋';
   };
 
+  if (showCodeManager) {
+    return <CodeManager user={user} onBack={() => setShowCodeManager(false)} />;
+  }
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -203,6 +197,15 @@ function AdminOverview({ user, onBack }) {
       <div className="ao-header">
         <button onClick={onBack} className="back-button">← Volver</button>
         <h2>📊 Vista General - {user.organizationName}</h2>
+        {user.role === 'admin' && !showCodeManager && (
+          <button
+            className="back-button"
+            style={{ marginTop: '1rem', backgroundColor: '#4caf50', color: '#fff' }}
+            onClick={() => setShowCodeManager(true)}
+          >
+            ➕ Administrar Códigos
+          </button>
+        )}
       </div>
 
       {/* Tarjetas de estadísticas */}
