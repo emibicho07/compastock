@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import './Login.css';
 
@@ -15,15 +15,6 @@ function Login({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Códigos de organización válidos (en producción esto vendría de la BD)
-  const validOrganizations = {
-    'demo-compastock': 'Demo CompaStock',
-    'tacos-del-norte': 'Tacos del Norte',
-    'pizzas-monterrey': 'Pizzas Monterrey',
-    'burger-express': 'Burger Express',
-    'comida-rapida-mx': 'Comida Rápida México'
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -34,21 +25,26 @@ function Login({ onLogin }) {
         // Login
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        
-        // Obtener datos del usuario
         const userDoc = await getDoc(doc(db, 'users', user.uid));
+
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          onLogin({
-            uid: user.uid,
-            email: user.email,
-            ...userData
-          });
+          onLogin({ uid: user.uid, email: user.email, ...userData });
         }
       } else {
-        // Validar código de organización
-        if (!organizationCode || !validOrganizations[organizationCode]) {
-          setError('Código de organización inválido. Contacta a tu administrador.');
+        // Validar código contra Firestore
+        const code = organizationCode.trim().toLowerCase();
+        const codeRef = doc(db, 'organizationCodes', code);
+        const codeSnap = await getDoc(codeRef);
+
+        if (!codeSnap.exists()) {
+          setError('❌ El código de organización no existe.');
+          setLoading(false);
+          return;
+        }
+
+        if (codeSnap.data().used) {
+          setError('❌ Este código ya fue utilizado.');
           setLoading(false);
           return;
         }
@@ -56,25 +52,26 @@ function Login({ onLogin }) {
         // Registro
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        
-        // Guardar información adicional del usuario
+
         const userData = {
           name,
           email,
           role,
           restaurant: role === 'restaurante' ? restaurant : null,
-          organizationId: organizationCode,
-          organizationName: validOrganizations[organizationCode],
+          organizationId: code,
+          organizationName: codeSnap.data().organizationName,
           createdAt: new Date().toISOString()
         };
-        
+
         await setDoc(doc(db, 'users', user.uid), userData);
-        
-        onLogin({
-          uid: user.uid,
-          email: user.email,
-          ...userData
+
+        await updateDoc(codeRef, {
+          used: true,
+          usedBy: user.uid,
+          usedAt: new Date().toISOString()
         });
+
+        onLogin({ uid: user.uid, email: user.email, ...userData });
       }
     } catch (error) {
       if (error.code === 'auth/user-not-found') {
@@ -95,7 +92,7 @@ function Login({ onLogin }) {
     <div className="login-container">
       <div className="login-card">
         <h2>{isLogin ? 'Iniciar Sesión' : 'Registrarse'}</h2>
-        
+
         <form onSubmit={handleSubmit}>
           {!isLogin && (
             <>
@@ -104,7 +101,7 @@ function Login({ onLogin }) {
                 <input
                   type="text"
                   value={organizationCode}
-                  onChange={(e) => setOrganizationCode(e.target.value.toLowerCase())}
+                  onChange={(e) => setOrganizationCode(e.target.value)}
                   placeholder="Ej: tacos-del-norte"
                   required
                 />
@@ -124,7 +121,7 @@ function Login({ onLogin }) {
               </div>
             </>
           )}
-          
+
           <div className="form-group">
             <label>Email:</label>
             <input
@@ -134,7 +131,7 @@ function Login({ onLogin }) {
               required
             />
           </div>
-          
+
           <div className="form-group">
             <label>Contraseña:</label>
             <input
@@ -144,7 +141,7 @@ function Login({ onLogin }) {
               required
             />
           </div>
-          
+
           {!isLogin && (
             <>
               <div className="form-group">
@@ -155,7 +152,7 @@ function Login({ onLogin }) {
                   <option value="admin">👑 Administrador</option>
                 </select>
               </div>
-              
+
               {role === 'restaurante' && (
                 <div className="form-group">
                   <label>Nombre del restaurante:</label>
@@ -170,42 +167,20 @@ function Login({ onLogin }) {
               )}
             </>
           )}
-          
+
           {error && <div className="error-message">{error}</div>}
-          
+
           <button type="submit" disabled={loading} className="login-button">
             {loading ? 'Cargando...' : (isLogin ? 'Iniciar Sesión' : 'Registrarse')}
           </button>
         </form>
-        
+
         <p className="toggle-mode">
           {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
-          <button
-            type="button"
-            onClick={() => setIsLogin(!isLogin)}
-            className="toggle-button"
-          >
+          <button type="button" onClick={() => setIsLogin(!isLogin)} className="toggle-button">
             {isLogin ? 'Registrarse' : 'Iniciar Sesión'}
           </button>
         </p>
-
-        {/* Información de códigos demo */}
-        {!isLogin && (
-          <div style={{ 
-            marginTop: '2rem', 
-            padding: '1rem', 
-            backgroundColor: '#f8f9fa', 
-            borderRadius: '8px',
-            fontSize: '0.9rem'
-          }}>
-            <strong>Códigos de Demo Disponibles:</strong>
-            <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-              <li><code>demo-compastock</code> - Demo General</li>
-              <li><code>tacos-del-norte</code> - Grupo Tacos</li>
-              <li><code>pizzas-monterrey</code> - Cadena Pizzas</li>
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   );
