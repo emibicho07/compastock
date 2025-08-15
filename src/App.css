@@ -476,9 +476,6 @@ body {
     color: var(--text-primary);
   }
 
-  #root {
-    background: var(--background-color);
-  }
   .login-card,
   .dashboard,
   .role-card {
