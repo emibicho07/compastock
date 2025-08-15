@@ -11,6 +11,7 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
   const [groupedOrders, setGroupedOrders] = useState({});
   const [urgentOrders, setUrgentOrders] = useState([]);
   const [pendingProducts, setPendingProducts] = useState([]);
+  const [availableProviders, setAvailableProviders] = useState([]);
 
   useEffect(() => {
     setCurrentView(initialView);
@@ -18,6 +19,7 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
 
   useEffect(() => {
     loadOrders();
+    loadProviders();
   }, []);
 
   const loadOrders = async () => {
@@ -47,6 +49,18 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
     }
   };
 
+  const loadProviders = async () => {
+    try {
+      const orgId = getOrganizationId(user);
+      const q = query(collection(db, 'providers'), where('organizationId', '==', orgId));
+      const querySnapshot = await getDocs(q);
+      const providers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAvailableProviders(providers);
+    } catch (error) {
+      console.error('Error al cargar proveedores:', error);
+    }
+  };
+
   const groupOrdersByProvider = (ordersData) => {
     const grouped = {};
     const pending = [];
@@ -55,7 +69,7 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
       order.items.forEach(item => {
         if (!item.status || item.status === 'pending') {
           const provider = item.selectedProvider || 'Sin Proveedor';
-          
+
           if (!grouped[provider]) {
             grouped[provider] = [];
           }
@@ -386,21 +400,20 @@ function SupplierDashboard({ user, onBack, initialView = 'providers' }) {
                   <div className="provider-assignment">
                     <label>Asignar proveedor:</label>
                     <select 
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          assignProvider(item.orderId, item.productId, e.target.value);
-                        }
-                      }}
-                      defaultValue=""
-                    >
-                      <option value="">Seleccionar proveedor</option>
-                      <option value="Walmart">🏪 Walmart</option>
-                      <option value="Sam's Club">🏪 Sam's Club</option>
-                      <option value="Restaurant Depot">🏪 Restaurant Depot</option>
-                      <option value="Mercado Local">🏪 Mercado Local</option>
-                      <option value="Proveedor A">🏪 Proveedor A</option>
-                      <option value="Proveedor B">🏪 Proveedor B</option>
-                    </select>
+                    onChange={(e) => {
+                   if (e.target.value) {
+                    assignProvider(item.orderId, item.productId, e.target.value);
+                   }
+                    }}
+                   defaultValue=""
+                  >
+                   <option value="">Seleccionar proveedor</option>
+                   {availableProviders.map((provider) => (
+                   <option key={provider.id} value={provider.name}>
+                    🏪 {provider.name}
+                   </option>
+                   ))}
+                   </select>
                   </div>
                 </div>
               ))}
