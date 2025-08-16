@@ -10,6 +10,7 @@ import AdminOverview from './AdminOverview';
 import UserManagement from './UserManagement';
 import OrganizationSettings from './OrganizationSettings';
 import ProviderManagement from './ProviderManagement';
+import EmailVerificationGate from './EmailVerificationGate'; // ⬅️ NUEVO
 import './App.css';
 
 function App() {
@@ -428,9 +429,12 @@ function App() {
         </div>
       )}
 
-      <main className="main-content">
-        {renderContent()}
-      </main>
+      {/* ⛔ Gate de verificación: bloquea vistas que leen Firestore */}
+      <EmailVerificationGate>
+        <main className="main-content">
+          {renderContent()}
+        </main>
+      </EmailVerificationGate>
 
       <footer className="app-footer">
         <p>CompaStock v1.0 PWA - Sistema para gestión de inventarios</p>

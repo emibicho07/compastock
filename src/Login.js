@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  signOut
+} from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import './Login.css';
@@ -22,17 +27,47 @@ function Login({ onLogin }) {
 
     try {
       if (isLogin) {
-        // Login
+        // ---------- LOGIN (con verificación de email) ----------
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
 
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          onLogin({ uid: user.uid, email: user.email, ...userData });
+        // Refresca user y token para traer emailVerified actualizado
+        await user.reload();
+        await user.getIdToken(true);
+
+        if (!user.emailVerified) {
+          const wantsResend = window.confirm(
+            'Tu correo aún no está verificado.\n\n¿Quieres que te reenviemos el correo de verificación?'
+          );
+          if (wantsResend) {
+            await sendEmailVerification(user);
+            alert(`Te reenviamos el correo de verificación a ${user.email}. Revisa tu bandeja o spam.`);
+          }
+          await signOut(auth);
+          setError('Debes verificar tu correo antes de continuar.');
+          setLoading(false);
+          return;
         }
+
+        // Cargar datos del usuario en Firestore
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        if (!userSnap.exists()) {
+          await signOut(auth);
+          setError('No se encontraron datos del usuario en la base de datos.');
+          setLoading(false);
+          return;
+        }
+
+        const userData = userSnap.data();
+        onLogin({
+          uid: user.uid,
+          email: user.email,
+          ...userData
+        });
+
       } else {
-        // Validar código contra Firestore
+        // ---------- REGISTRO ----------
+        // 1) Validar código (lectura puntual permitida si used == false)
         const code = organizationCode.trim().toLowerCase();
         const codeRef = doc(db, 'organizationCodes', code);
         const codeSnap = await getDoc(codeRef);
@@ -42,18 +77,19 @@ function Login({ onLogin }) {
           setLoading(false);
           return;
         }
-
         if (codeSnap.data().used) {
           setError('❌ Este código ya fue utilizado.');
           setLoading(false);
           return;
         }
 
-        // Registro
+        // 2) Crear cuenta de Auth
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
+        // 3) Guardar doc de usuario en Firestore
         const userData = {
+          uid: user.uid,
           name,
           email,
           role,
@@ -62,16 +98,25 @@ function Login({ onLogin }) {
           organizationName: codeSnap.data().organizationName,
           createdAt: new Date().toISOString()
         };
-
         await setDoc(doc(db, 'users', user.uid), userData);
 
+        // 4) Marcar el código como usado
         await updateDoc(codeRef, {
           used: true,
           usedBy: user.uid,
           usedAt: new Date().toISOString()
         });
 
-        onLogin({ uid: user.uid, email: user.email, ...userData });
+        // 5) Enviar verificación por email
+        await sendEmailVerification(auth.currentUser);
+        alert(`Te enviamos un correo de verificación a ${user.email}. Verifícalo para continuar.`);
+
+        // 6) Notificar a la app (el EmailVerificationGate bloqueará vistas hasta que verifique)
+        onLogin({
+          uid: user.uid,
+          email: user.email,
+          ...userData
+        });
       }
     } catch (error) {
       if (error.code === 'auth/user-not-found') {
@@ -80,8 +125,10 @@ function Login({ onLogin }) {
         setError('Contraseña incorrecta.');
       } else if (error.code === 'auth/email-already-in-use') {
         setError('Este email ya está registrado.');
+      } else if (error.code === 'permission-denied') {
+        setError('Permiso denegado por reglas de seguridad. Verifica tu correo o tu organización.');
       } else {
-        setError(error.message);
+        setError(error.message || 'Ocurrió un error.');
       }
     } finally {
       setLoading(false);
@@ -102,11 +149,11 @@ function Login({ onLogin }) {
                   type="text"
                   value={organizationCode}
                   onChange={(e) => setOrganizationCode(e.target.value)}
-                  placeholder="Ej: tacos-del-norte"
+                  placeholder="Ej: compastock-prueba"
                   required
                 />
                 <small style={{ color: '#666', fontSize: '0.8rem' }}>
-                  Contacta a tu administrador para obtener este código
+                  Pide a tu admin el código de tu organización
                 </small>
               </div>
 
@@ -177,7 +224,11 @@ function Login({ onLogin }) {
 
         <p className="toggle-mode">
           {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
-          <button type="button" onClick={() => setIsLogin(!isLogin)} className="toggle-button">
+          <button
+            type="button"
+            onClick={() => setIsLogin(!isLogin)}
+            className="toggle-button"
+          >
             {isLogin ? 'Registrarse' : 'Iniciar Sesión'}
           </button>
         </p>
