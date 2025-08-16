@@ -461,29 +461,3 @@ body {
     transition: all 0.1s ease;
   }
 }
-
-/* PWA: Modo oscuro (respeta preferencias del sistema) */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background-color: #121212;
-    --surface-color: #1e1e1e;
-    --text-primary: #ffffff;
-    --text-secondary: #b3b3b3;
-  }
-
-  body {
-    background: var(--background-color);
-    color: var(--text-primary);
-  }
-
-  .login-card,
-  .dashboard,
-  .role-card {
-    background: var(--surface-color);
-    color: var(--text-primary);
-  }
-
-  .offline-banner {
-    background: linear-gradient(135deg, #ff6f00 0%, #e65100 100%);
-  }
-}
