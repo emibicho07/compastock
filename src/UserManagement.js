@@ -1,48 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+  query,
+  where,
+  setDoc,
+} from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { getOrganizationId } from './utils';
 import './UserManagement.css';
 
+// 🔧 Evita mandar undefined a Firestore
+const sanitizeForFirestore = (obj) =>
+  Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+
 function UserManagement({ user, onBack }) {
   const [users, setUsers] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
+  const [editingUser, setEditingUser] = useState(null); // doc seleccionado
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     role: 'restaurante',
     restaurant: '',
-    active: true
+    active: true,
   });
-  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadUsers = async () => {
     try {
+      setLoading(true);
       const orgId = getOrganizationId(user);
       if (!orgId) {
         console.error('Usuario sin organizationId válido:', user);
-        setLoading(false);
+        setUsers([]);
         return;
       }
-
       const q = query(collection(db, 'users'), where('organizationId', '==', orgId));
       const snapshot = await getDocs(q);
-      const usersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const usersData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      usersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      usersData.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
       setUsers(usersData);
-    } catch (error) {
-      console.error('Error al cargar usuarios:', error);
+    } catch (err) {
+      console.error('Error al cargar usuarios:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setEditingUser(null);
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      role: 'restaurante',
+      restaurant: '',
+      active: true,
+    });
+  };
+
+  const handleEdit = (userToEdit) => {
+    setEditingUser(userToEdit);
+    setFormData({
+      name: userToEdit.name || '',
+      email: userToEdit.email || '',
+      password: '',
+      role: userToEdit.role || 'restaurante',
+      restaurant: userToEdit.role === 'restaurante' ? (userToEdit.restaurant ?? '') : '',
+      active: userToEdit.active ?? true,
+    });
+    setShowForm(true);
+  };
+
+  const handleToggleActive = async (userToToggle) => {
+    if (userToToggle.id === user.uid) {
+      alert('❌ No puedes desactivar tu propia cuenta');
+      return;
+    }
+    try {
+      const payload = sanitizeForFirestore({
+        active: !(userToToggle.active ?? true),
+        updatedAt: new Date().toISOString(),
+      });
+      await updateDoc(doc(db, 'users', userToToggle.id), payload);
+      await loadUsers();
+    } catch (err) {
+      console.error('Error al cambiar estado:', err);
+      alert('❌ Error al cambiar estado del usuario');
     }
   };
 
@@ -56,47 +113,58 @@ function UserManagement({ user, onBack }) {
 
       if (!orgId) {
         alert('❌ Error: No se pudo obtener información de la organización');
-        setSubmitting(false);
         return;
       }
 
       if (editingUser) {
-        const updateData = {
-          name: formData.name,
-          email: formData.email,
+        // 🔒 No actualizar email aquí (lo controla Firebase Auth)
+        const updateData = sanitizeForFirestore({
+          name: (formData.name || '').trim(),
           role: formData.role,
-          restaurant: formData.role === 'restaurante' ? formData.restaurant : null,
-          active: formData.active,
-          updatedAt: new Date().toISOString()
-        };
+          restaurant:
+            formData.role === 'restaurante'
+              ? (formData.restaurant || '').trim() || null
+              : null,
+          active: formData.active ?? true,
+          updatedAt: new Date().toISOString(),
+        });
 
         await updateDoc(doc(db, 'users', editingUser.id), updateData);
         alert('✅ Usuario actualizado exitosamente');
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
-        const newUser = userCredential.user;
+        // Crea al usuario en Auth y el doc en /users/{uid}
+        const cred = await createUserWithEmailAndPassword(
+          auth,
+          formData.email,
+          formData.password
+        );
+        const newUser = cred.user;
 
-        const userData = {
-          name: formData.name,
-          email: formData.email,
+        const userData = sanitizeForFirestore({
+          uid: newUser.uid,
+          name: (formData.name || '').trim(),
+          email: (formData.email || '').trim(),
           role: formData.role,
-          restaurant: formData.role === 'restaurante' ? formData.restaurant : null,
+          restaurant:
+            formData.role === 'restaurante'
+              ? (formData.restaurant || '').trim() || null
+              : null,
           organizationId: orgId,
           organizationName: orgName,
-          active: formData.active,
+          active: formData.active ?? true,
           createdAt: new Date().toISOString(),
-          createdBy: user.name
-        };
+          createdBy: user.name || user.email || 'Admin',
+        });
 
-        await addDoc(collection(db, 'users'), userData);
+        // ⛑️ usa setDoc con ID = UID para respetar las reglas y el login
+        await setDoc(doc(db, 'users', newUser.uid), userData);
+
         alert('✅ Usuario creado exitosamente');
       }
 
       await loadUsers();
       setShowForm(false);
-      setEditingUser(null);
       resetForm();
-
     } catch (error) {
       console.error('Error al guardar usuario:', error);
 
@@ -107,81 +175,27 @@ function UserManagement({ user, onBack }) {
       } else if (error.code === 'auth/invalid-email') {
         alert('❌ Email no válido');
       } else {
-        alert('❌ Error al guardar usuario: ' + error.message);
+        alert('❌ Error al guardar usuario: ' + (error.message || error.code || ''));
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleEdit = (userToEdit) => {
-    setEditingUser(userToEdit);
-    setFormData({
-      name: userToEdit.name,
-      email: userToEdit.email,
-      password: '', // No mostrar contraseña
-      role: userToEdit.role,
-      restaurant: userToEdit.restaurant || '',
-      active: userToEdit.active
-    });
-    setShowForm(true);
-  };
-
-  const handleToggleActive = async (userToToggle) => {
-    if (userToToggle.id === user.uid) {
-      alert('❌ No puedes desactivar tu propia cuenta');
-      return;
-    }
-
-    try {
-      await updateDoc(doc(db, 'users', userToToggle.id), {
-        active: !userToToggle.active,
-        updatedAt: new Date().toISOString()
-      });
-      await loadUsers();
-    } catch (error) {
-      console.error('Error al cambiar estado:', error);
-      alert('❌ Error al cambiar estado del usuario');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      role: 'restaurante',
-      restaurant: '',
-      active: true
-    });
-  };
-
   const getRoleIcon = (role) => {
-    const icons = {
-      'restaurante': '🍴',
-      'surtidor': '🚚',
-      'admin': '👑'
-    };
+    const icons = { restaurante: '🍴', surtidor: '🚚', admin: '👑' };
     return icons[role] || '👤';
   };
 
   const getRoleText = (role) => {
-    const roles = {
-      'restaurante': 'Restaurante',
-      'surtidor': 'Surtidor',
-      'admin': 'Administrador'
-    };
+    const roles = { restaurante: 'Restaurante', surtidor: 'Surtidor', admin: 'Administrador' };
     return roles[role] || role;
   };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric'
-    });
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   if (loading) {
@@ -198,10 +212,7 @@ function UserManagement({ user, onBack }) {
       <div className="um-header">
         <button onClick={onBack} className="back-button">← Volver</button>
         <h2>👥 Gestionar Usuarios - {user.organizationName}</h2>
-        <button 
-          onClick={() => setShowForm(!showForm)} 
-          className="add-button"
-        >
+        <button onClick={() => { setShowForm(!showForm); if (!showForm) resetForm(); }} className="add-button">
           {showForm ? 'Cancelar' : '+ Agregar Usuario'}
         </button>
       </div>
@@ -210,28 +221,28 @@ function UserManagement({ user, onBack }) {
         <div className="user-form-container">
           <form onSubmit={handleSubmit} className="user-form">
             <h3>{editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
-            
+
             <div className="form-row">
               <div className="form-group">
                 <label>Nombre completo:</label>
                 <input
                   type="text"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Ej: Juan Pérez"
                   required
                 />
               </div>
-              
+
               <div className="form-group">
                 <label>Email:</label>
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="usuario@ejemplo.com"
                   required
-                  disabled={editingUser !== null}
+                  disabled={!!editingUser}
                 />
                 {editingUser && <small>No se puede cambiar el email</small>}
               </div>
@@ -243,34 +254,34 @@ function UserManagement({ user, onBack }) {
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Mínimo 6 caracteres"
-                  minLength="6"
+                  minLength={6}
                   required
                 />
               </div>
             )}
-            
+
             <div className="form-row">
               <div className="form-group">
                 <label>Rol:</label>
                 <select
                   value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 >
                   <option value="restaurante">🍴 Restaurante</option>
                   <option value="surtidor">🚚 Surtidor</option>
                   <option value="admin">👑 Administrador</option>
                 </select>
               </div>
-              
+
               {formData.role === 'restaurante' && (
                 <div className="form-group">
                   <label>Nombre del restaurante:</label>
                   <input
                     type="text"
                     value={formData.restaurant}
-                    onChange={(e) => setFormData({...formData, restaurant: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, restaurant: e.target.value })}
                     placeholder="Ej: Sucursal Centro"
                     required
                   />
@@ -280,7 +291,7 @@ function UserManagement({ user, onBack }) {
 
             <div className="form-actions">
               <button type="submit" disabled={submitting} className="save-button">
-                {submitting ? 'Guardando...' : (editingUser ? 'Actualizar Usuario' : 'Crear Usuario')}
+                {submitting ? 'Guardando...' : editingUser ? 'Actualizar Usuario' : 'Crear Usuario'}
               </button>
             </div>
           </form>
@@ -291,78 +302,65 @@ function UserManagement({ user, onBack }) {
         <div className="users-header">
           <h3>Lista de Usuarios ({users.length})</h3>
           <div className="users-stats">
-            <span className="stat">
-              👑 {users.filter(u => u.role === 'admin').length} Admins
-            </span>
-            <span className="stat">
-              🍴 {users.filter(u => u.role === 'restaurante').length} Restaurantes
-            </span>
-            <span className="stat">
-              🚚 {users.filter(u => u.role === 'surtidor').length} Surtidores
-            </span>
+            <span className="stat">👑 {users.filter((u) => u.role === 'admin').length} Admins</span>
+            <span className="stat">🍴 {users.filter((u) => u.role === 'restaurante').length} Restaurantes</span>
+            <span className="stat">🚚 {users.filter((u) => u.role === 'surtidor').length} Surtidores</span>
           </div>
         </div>
 
         {users.length === 0 ? (
           <div className="empty-state">
             <p>👥 No hay usuarios en la organización</p>
-            <button onClick={() => setShowForm(true)} className="add-button">
+            <button onClick={() => { setShowForm(true); resetForm(); }} className="add-button">
               Agregar primer usuario
             </button>
           </div>
         ) : (
           <div className="users-grid">
-            {users.map(userData => (
-              <div key={userData.id} className={`user-card ${!userData.active ? 'inactive' : ''}`}>
+            {users.map((u) => (
+              <div key={u.id} className={`user-card ${!(u.active ?? true) ? 'inactive' : ''}`}>
                 <div className="user-header">
-                  <div className="user-avatar">
-                    {getRoleIcon(userData.role)}
-                  </div>
+                  <div className="user-avatar">{getRoleIcon(u.role)}</div>
                   <div className="user-info">
-                    <h4>{userData.name}</h4>
-                    <p className="user-email">{userData.email}</p>
+                    <h4>{u.name || '-'}</h4>
+                    <p className="user-email">{u.email || '-'}</p>
                   </div>
                   <div className="user-status">
-                    {userData.active ? (
+                    {(u.active ?? true) ? (
                       <span className="status-badge active">Activo</span>
                     ) : (
                       <span className="status-badge inactive">Inactivo</span>
                     )}
                   </div>
                 </div>
-                
+
                 <div className="user-details">
                   <div className="detail-item">
-                    <strong>Rol:</strong> {getRoleText(userData.role)}
+                    <strong>Rol:</strong> {getRoleText(u.role)}
                   </div>
-                  {userData.restaurant && (
+                  {u.role === 'restaurante' && (
                     <div className="detail-item">
-                      <strong>Restaurante:</strong> {userData.restaurant}
+                      <strong>Restaurante:</strong> {u.restaurant || '-'}
                     </div>
                   )}
                   <div className="detail-item">
-                    <strong>Creado:</strong> {formatDate(userData.createdAt)}
+                    <strong>Creado:</strong> {formatDate(u.createdAt)}
                   </div>
-                  {userData.createdBy && (
+                  {u.createdBy && (
                     <div className="detail-item">
-                      <strong>Por:</strong> {userData.createdBy}
+                      <strong>Por:</strong> {u.createdBy}
                     </div>
                   )}
                 </div>
 
                 <div className="user-actions">
-                  <button 
-                    onClick={() => handleEdit(userData)} 
-                    className="edit-btn"
+                  <button onClick={() => handleEdit(u)} className="edit-btn">✏️ Editar</button>
+                  <button
+                    onClick={() => handleToggleActive(u)}
+                    className={`toggle-btn ${(u.active ?? true) ? 'deactivate' : 'activate'}`}
+                    disabled={u.id === user.uid}
                   >
-                    ✏️ Editar
-                  </button>
-                  <button 
-                    onClick={() => handleToggleActive(userData)} 
-                    className={`toggle-btn ${userData.active ? 'deactivate' : 'activate'}`}
-                    disabled={userData.id === user.uid}
-                  >
-                    {userData.active ? '❌ Desactivar' : '✅ Activar'}
+                    {(u.active ?? true) ? '❌ Desactivar' : '✅ Activar'}
                   </button>
                 </div>
               </div>
