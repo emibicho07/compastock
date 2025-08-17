@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore'; // 👈 limpiado
 import { auth, db } from './firebase';
 import Login from './Login';
 import ProductManagement from './ProductManagement';
@@ -10,7 +10,7 @@ import AdminOverview from './AdminOverview';
 import UserManagement from './UserManagement';
 import OrganizationSettings from './OrganizationSettings';
 import ProviderManagement from './ProviderManagement';
-import EmailVerificationGate from './EmailVerificationGate'; // ⬅️ NUEVO
+import EmailVerificationGate from './EmailVerificationGate';
 import './App.css';
 
 function App() {
@@ -22,46 +22,31 @@ function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
-  // FUNCIÓN ROBUSTA PARA CARGAR USUARIO COMPLETO
-  const loadCompleteUserData = async (firebaseUser) => {
+  // FUNCIÓN ROBUSTA PARA CARGAR USUARIO COMPLETO (por UID + reintento)
+  const loadCompleteUserData = async (firebaseUser, tries = 2) => {
     try {
-      // Intentar buscar por email en la colección users
-      const emailQuery = query(
-        collection(db, 'users'),
-        where('email', '==', firebaseUser.email)
-      );
-      const emailSnapshot = await getDocs(emailQuery);
-      
-      if (!emailSnapshot.empty) {
-        // Usuario encontrado por email - datos completos
-        const userDoc = emailSnapshot.docs[0];
-        const userData = userDoc.data();
-        
+      const ref = doc(db, 'users', firebaseUser.uid);
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
         return {
           uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          firestoreId: userDoc.id,
-          ...userData
+          email: firebaseUser.email || '',
+          firestoreId: snap.id,
+          ...snap.data(),
         };
       }
-      
-      // Fallback: buscar por UID (método original)
-      const uidDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      if (uidDoc.exists()) {
-        return {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          firestoreId: uidDoc.id,
-          ...uidDoc.data()
-        };
+
+      // posible carrera con setDoc() tras registro
+      if (tries > 0) {
+        await new Promise((r) => setTimeout(r, 400));
+        return await loadCompleteUserData(firebaseUser, tries - 1);
       }
-      
-      // Si no se encuentra de ninguna manera
-      console.error('Usuario no encontrado en Firestore');
+
+      console.error('[USER] No existe /users/{uid} tras reintento');
       return null;
-      
-    } catch (error) {
-      console.error('Error cargando datos completos del usuario:', error);
+    } catch (err) {
+      console.error('[USER] Error leyendo /users/{uid}:', err);
       return null;
     }
   };
@@ -74,7 +59,6 @@ function App() {
           if (completeUserData) {
             setUser(completeUserData);
           } else {
-            // Si no se pueden cargar los datos, cerrar sesión
             await signOut(auth);
             setUser(null);
             alert('Error al cargar datos del usuario. Por favor, inicia sesión nuevamente.');
@@ -109,16 +93,15 @@ function App() {
   // PWA: Registrar Service Worker
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js')
+      navigator.serviceWorker
+        .register('/sw.js')
         .then((registration) => {
           console.log('Service Worker registrado:', registration.scope);
-          
-          // Escuchar actualizaciones del SW
+
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // Nueva versión disponible
                 if (window.confirm('Nueva versión de CompaStock disponible. ¿Actualizar ahora?')) {
                   newWorker.postMessage({ type: 'SKIP_WAITING' });
                   window.location.reload();
@@ -143,7 +126,6 @@ function App() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Detectar si ya está instalado
     window.addEventListener('appinstalled', () => {
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
@@ -159,7 +141,7 @@ function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
-    
+
     if (action && user) {
       switch (action) {
         case 'create-order':
@@ -203,28 +185,27 @@ function App() {
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    
+
     if (outcome === 'accepted') {
       console.log('Usuario aceptó instalar CompaStock');
     } else {
       console.log('Usuario rechazó instalar CompaStock');
     }
-    
+
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
   };
 
   const renderContent = () => {
-    // Navegación específica por componente
     if (currentView === 'products') {
       return <ProductManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
-    
+
     if (currentView === 'restaurant-orders') {
       return (
-        <RestaurantOrders 
+        <RestaurantOrders
           key={`${viewParams.initialView}-${viewParams.initialUrgent}`}
-          user={user} 
+          user={user}
           onBack={() => setCurrentView('dashboard')}
           initialView={viewParams.initialView}
           initialUrgent={viewParams.initialUrgent}
@@ -234,9 +215,9 @@ function App() {
 
     if (currentView === 'supplier-dashboard') {
       return (
-        <SupplierDashboard 
+        <SupplierDashboard
           key={viewParams.initialView}
-          user={user} 
+          user={user}
           onBack={() => setCurrentView('dashboard')}
           initialView={viewParams.initialView}
         />
@@ -259,35 +240,44 @@ function App() {
       return <ProviderManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
 
-    // Dashboard por defecto
     switch (user?.role) {
       case 'restaurante':
         return (
           <div className="dashboard">
             <h2>🍴 Dashboard Restaurante</h2>
-            <p>Bienvenido, <strong>{user.name}</strong></p>
-            <p>Restaurante: <strong>{user.restaurant}</strong></p>
-            <p>Organización: <strong>{user.organizationName}</strong></p>
+            <p>
+              Bienvenido, <strong>{user.name}</strong>
+            </p>
+            <p>
+              Restaurante: <strong>{user.restaurant}</strong>
+            </p>
+            <p>
+              Organización: <strong>{user.organizationName}</strong>
+            </p>
             <div className="dashboard-options">
-              <button 
+              <button
                 className="dashboard-button"
-                onClick={() => handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: false })}
+                onClick={() =>
+                  handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: false })
+                }
               >
                 📝 Crear Pedido Semanal
               </button>
-              <button 
+              <button
                 className="dashboard-button urgent-button"
-                onClick={() => handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: true })}
+                onClick={() =>
+                  handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: true })
+                }
               >
                 🚨 Pedido Urgente
               </button>
-              <button 
+              <button
                 className="dashboard-button"
                 onClick={() => handleNavigation('restaurant-orders', { initialView: 'history' })}
               >
                 📋 Ver Mis Pedidos
               </button>
-              <button 
+              <button
                 className="dashboard-button"
                 onClick={() => handleNavigation('restaurant-orders', { initialView: 'history' })}
               >
@@ -296,89 +286,79 @@ function App() {
             </div>
           </div>
         );
-      
+
       case 'surtidor':
         return (
           <div className="dashboard">
             <h2>🚚 Dashboard Surtidor</h2>
-            <p>Bienvenido, <strong>{user.name}</strong></p>
-            <p>Organización: <strong>{user.organizationName}</strong></p>
+            <p>
+              Bienvenido, <strong>{user.name}</strong>
+            </p>
+            <p>
+              Organización: <strong>{user.organizationName}</strong>
+            </p>
             <div className="dashboard-options">
-              <button 
+              <button
                 className="dashboard-button"
                 onClick={() => handleNavigation('supplier-dashboard', { initialView: 'providers' })}
               >
                 🏪 Ver por Proveedores
               </button>
-              <button 
+              <button
                 className="dashboard-button urgent-button"
                 onClick={() => handleNavigation('supplier-dashboard', { initialView: 'urgent' })}
               >
                 🚨 Pedidos Urgentes
               </button>
-              <button 
+              <button
                 className="dashboard-button"
                 onClick={() => handleNavigation('supplier-dashboard', { initialView: 'pending' })}
               >
                 ⏳ Productos Pendientes
               </button>
-              <button 
+              <button
                 className="dashboard-button"
                 onClick={() => handleNavigation('supplier-dashboard', { initialView: 'providers' })}
               >
                 ✅ Marcar Entregas
               </button>
-              <button 
-                className="dashboard-button"
-                onClick={() => handleNavigation('provider-management')}
-              >
+              <button className="dashboard-button" onClick={() => handleNavigation('provider-management')}>
                 🏪 Gestionar Proveedores
               </button>
             </div>
           </div>
         );
-      
+
       case 'admin':
         return (
           <div className="dashboard">
             <h2>👑 Dashboard Administrador</h2>
-            <p>Bienvenido, <strong>{user.name}</strong></p>
-            <p>Organización: <strong>{user.organizationName}</strong></p>
+            <p>
+              Bienvenido, <strong>{user.name}</strong>
+            </p>
+            <p>
+              Organización: <strong>{user.organizationName}</strong>
+            </p>
             <div className="dashboard-options">
-              <button 
-                className="dashboard-button"
-                onClick={() => handleNavigation('admin-overview')}
-              >
+              <button className="dashboard-button" onClick={() => handleNavigation('admin-overview')}>
                 📊 Vista General
               </button>
-              <button 
-                className="dashboard-button"
-                onClick={() => handleNavigation('products')}
-              >
+              <button className="dashboard-button" onClick={() => handleNavigation('products')}>
                 📦 Gestionar Productos
               </button>
-              <button 
-                className="dashboard-button"
-                onClick={() => handleNavigation('user-management')}
-              >
+              <button className="dashboard-button" onClick={() => handleNavigation('user-management')}>
                 👥 Gestionar Usuarios
               </button>
-              <button 
-                className="dashboard-button"
-                onClick={() => handleNavigation('provider-management')}
-              >
+              <button className="dashboard-button" onClick={() => handleNavigation('provider-management')}>
                 🏪 Gestionar Proveedores
               </button>
-              <button 
-                className="dashboard-button"
-                onClick={() => handleNavigation('organization-settings')}
-              >
+              <button className="dashboard-button" onClick={() => handleNavigation('organization-settings')}>
                 ⚙️ Configuración
               </button>
             </div>
           </div>
         );
-      
+
       default:
         return <div>Rol no reconocido</div>;
     }
@@ -403,18 +383,16 @@ function App() {
         <div className="header-content">
           <h1>CompaStock</h1>
           <div className="header-actions">
-            {/* PWA: Indicador de conexión */}
             <div className={`connection-indicator ${isOnline ? 'online' : 'offline'}`}>
               {isOnline ? '🟢' : '🔴'} {isOnline ? 'En línea' : 'Sin conexión'}
             </div>
-            
-            {/* PWA: Botón de instalación */}
+
             {showInstallPrompt && (
               <button onClick={handleInstallApp} className="install-button">
                 📱 Instalar App
               </button>
             )}
-            
+
             <button onClick={handleLogout} className="logout-button">
               Cerrar Sesión
             </button>
@@ -422,18 +400,11 @@ function App() {
         </div>
       </header>
 
-      {/* PWA: Banner de conexión perdida */}
-      {!isOnline && (
-        <div className="offline-banner">
-          ⚠️ Sin conexión - Algunas funciones pueden no estar disponibles
-        </div>
-      )}
+      {!isOnline && <div className="offline-banner">⚠️ Sin conexión - Algunas funciones pueden no estar disponibles</div>}
 
-      {/* ⛔ Gate de verificación: bloquea vistas que leen Firestore */}
+      {/* Gate de verificación: bloquea vistas que leen Firestore */}
       <EmailVerificationGate>
-        <main className="main-content">
-          {renderContent()}
-        </main>
+        <main className="main-content">{renderContent()}</main>
       </EmailVerificationGate>
 
       <footer className="app-footer">

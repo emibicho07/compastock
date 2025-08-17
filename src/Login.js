@@ -3,7 +3,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendEmailVerification,
-  signOut
+  signOut,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -49,7 +49,7 @@ function Login({ onLogin }) {
           return;
         }
 
-        // Cargar datos del usuario en Firestore
+        // Cargar datos del usuario en Firestore (doc: users/{uid})
         const userSnap = await getDoc(doc(db, 'users', user.uid));
         if (!userSnap.exists()) {
           await signOut(auth);
@@ -59,16 +59,17 @@ function Login({ onLogin }) {
         }
 
         const userData = userSnap.data();
-        onLogin({
-          uid: user.uid,
-          email: user.email,
-          ...userData
-        });
-
+        onLogin({ uid: user.uid, email: user.email, ...userData });
       } else {
         // ---------- REGISTRO ----------
         // 1) Validar código (lectura puntual permitida si used == false)
         const code = organizationCode.trim().toLowerCase();
+        if (!code) {
+          setError('Debes ingresar un código de organización.');
+          setLoading(false);
+          return;
+        }
+
         const codeRef = doc(db, 'organizationCodes', code);
         const codeSnap = await getDoc(codeRef);
 
@@ -77,7 +78,7 @@ function Login({ onLogin }) {
           setLoading(false);
           return;
         }
-        if (codeSnap.data().used) {
+        if (codeSnap.data().used !== false) {
           setError('❌ Este código ya fue utilizado.');
           setLoading(false);
           return;
@@ -87,7 +88,7 @@ function Login({ onLogin }) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        // 3) Guardar doc de usuario en Firestore
+        // 3) Guardar doc de usuario en Firestore (users/{uid})
         const userData = {
           uid: user.uid,
           name,
@@ -95,8 +96,8 @@ function Login({ onLogin }) {
           role,
           restaurant: role === 'restaurante' ? restaurant : null,
           organizationId: code,
-          organizationName: codeSnap.data().organizationName,
-          createdAt: new Date().toISOString()
+          organizationName: codeSnap.data().organizationName || code,
+          createdAt: new Date().toISOString(),
         };
         await setDoc(doc(db, 'users', user.uid), userData);
 
@@ -104,7 +105,7 @@ function Login({ onLogin }) {
         await updateDoc(codeRef, {
           used: true,
           usedBy: user.uid,
-          usedAt: new Date().toISOString()
+          usedAt: new Date().toISOString(),
         });
 
         // 5) Enviar verificación por email
@@ -112,13 +113,10 @@ function Login({ onLogin }) {
         alert(`Te enviamos un correo de verificación a ${user.email}. Verifícalo para continuar.`);
 
         // 6) Notificar a la app (el EmailVerificationGate bloqueará vistas hasta que verifique)
-        onLogin({
-          uid: user.uid,
-          email: user.email,
-          ...userData
-        });
+        onLogin({ uid: user.uid, email: user.email, ...userData });
       }
     } catch (error) {
+      // Manejo de errores más claros
       if (error.code === 'auth/user-not-found') {
         setError('Usuario no encontrado. Verifica tu email.');
       } else if (error.code === 'auth/wrong-password') {
@@ -130,6 +128,7 @@ function Login({ onLogin }) {
       } else {
         setError(error.message || 'Ocurrió un error.');
       }
+      console.error('[Login] Error:', error);
     } finally {
       setLoading(false);
     }
@@ -149,7 +148,7 @@ function Login({ onLogin }) {
                   type="text"
                   value={organizationCode}
                   onChange={(e) => setOrganizationCode(e.target.value)}
-                  placeholder="Ej: compastock-prueba"
+                  placeholder="Ej: restaurante-demo"
                   required
                 />
                 <small style={{ color: '#666', fontSize: '0.8rem' }}>
