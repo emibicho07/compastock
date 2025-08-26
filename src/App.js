@@ -10,6 +10,7 @@ import AdminOverview from './AdminOverview';
 import UserManagement from './UserManagement';
 import OrganizationSettings from './OrganizationSettings';
 import ProviderManagement from './ProviderManagement';
+import InventoryControl from './InventoryControl';
 import EmailVerificationGate from './EmailVerificationGate';
 import './App.css';
 
@@ -201,6 +202,10 @@ function App() {
       return <ProductManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
 
+    if (currentView === 'inventory-control') {
+      return <InventoryControl user={user} onBack={() => setCurrentView('dashboard')} />;
+    }
+
     if (currentView === 'restaurant-orders') {
       return (
         <RestaurantOrders
@@ -262,6 +267,9 @@ function App() {
                 }
               >
                 📝 Crear Pedido Semanal
+              </button>
+              <button className="dashboard-button" onClick={() => handleNavigation('inventory-control')}>
+                📊 Ver Inventario
               </button>
               <button
                 className="dashboard-button urgent-button"
@@ -342,6 +350,9 @@ function App() {
             <div className="dashboard-options">
               <button className="dashboard-button" onClick={() => handleNavigation('admin-overview')}>
                 📊 Vista General
+              </button>
+              <button className="dashboard-button" onClick={() => handleNavigation('inventory-control')}>
+                📊 Gestionar Inventario
               </button>
               <button className="dashboard-button" onClick={() => handleNavigation('products')}>
                 📦 Gestionar Productos
