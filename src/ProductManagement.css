@@ -245,3 +245,236 @@
     padding: 1.5rem;
   }
 }
+/* Estilos adicionales para control de stock */
+
+/* Alertas de stock bajo */
+.stock-alerts {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.stock-alerts h3 {
+  color: #856404;
+  margin: 0 0 10px 0;
+  font-size: 16px;
+}
+
+.alert-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alert-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #ffeaa7;
+}
+
+.restock-btn {
+  background: #28a745;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.restock-btn:hover {
+  background: #218838;
+}
+
+/* Formulario de stock */
+.stock-form-container {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.stock-form {
+  max-width: 500px;
+}
+
+.stock-form h3 {
+  color: #495057;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.stock-form p {
+  background: #e9ecef;
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+/* Controles de stock en formulario de producto */
+.stock-controls {
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  padding: 15px;
+  margin: 15px 0;
+}
+
+.stock-controls h4 {
+  margin: 0 0 10px 0;
+  color: #495057;
+  font-size: 14px;
+}
+
+/* Badges de estado de stock */
+.status-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stock-badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.stock-empty {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.stock-low {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.stock-ok {
+  background: #d4edda;
+  color: #155724;
+}
+
+/* Botones de stock en las tarjetas */
+.stock-actions {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.stock-in-btn, .stock-out-btn {
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 36px;
+}
+
+.stock-in-btn {
+  background: #d4edda;
+  color: #155724;
+}
+
+.stock-in-btn:hover {
+  background: #c3e6cb;
+  transform: translateY(-1px);
+}
+
+.stock-out-btn {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.stock-out-btn:hover {
+  background: #f5c6cb;
+  transform: translateY(-1px);
+}
+
+/* Ajustes a las acciones de productos */
+.product-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+/* Detalles de producto con mejor espaciado */
+.product-details p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+/* Formulario de stock específico */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.cancel-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #5a6268;
+}
+
+/* Responsive para móviles */
+@media (max-width: 768px) {
+  .alert-item {
+    flex-direction: column;
+    gap: 8px;
+    text-align: center;
+  }
+  
+  .stock-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .product-actions {
+    justify-content: center;
+  }
+  
+  .status-badges {
+    justify-content: center;
+  }
+}
+
+/* Animaciones sutiles */
+.stock-badge {
+  transition: all 0.2s ease;
+}
+
+.product-card:hover .stock-badge {
+  transform: scale(1.05);
+}
+
+.alert-item {
+  transition: all 0.2s ease;
+}
+
+.alert-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
