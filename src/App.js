@@ -1,4 +1,4 @@
-// App.jsx (versión corregida)
+// App.js (versión robusta)
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
@@ -15,7 +15,7 @@ import InventoryControl from './InventoryControl';
 import EmailVerificationGate from './EmailVerificationGate';
 import './App.css';
 
-// ↓ Puedes ponerlo en true cuando verifiques que tu sw.js está actualizado y sirviendo bien
+// ↓ Actívalo cuando verifiques que tu sw.js está bien en producción
 const ENABLE_SW = false;
 
 function App() {
@@ -88,7 +88,7 @@ function App() {
     };
   }, []);
 
-  // PWA: Registrar Service Worker (desactivado por defecto para evitar 404 por SW obsoleto)
+  // PWA: Registrar Service Worker (desactivado por defecto)
   useEffect(() => {
     if (!ENABLE_SW) return;
     if ('serviceWorker' in navigator) {
@@ -180,11 +180,21 @@ function App() {
     setShowInstallPrompt(false);
   };
 
-  // 🔒 Normaliza el rol para evitar mismatches (Admin vs admin vs administrador)
+  // 🔒 Normaliza rol y calcula 'canAdmin' con múltiples señales
   const normalizedRole = (user?.role ?? '').toString().trim().toLowerCase();
-  // Debug útil
-  console.log('Role original:', user?.role, '→ normalizado:', normalizedRole);
-  console.log('Current view:', currentView);
+  const canAdmin =
+    normalizedRole === 'admin' ||
+    normalizedRole === 'administrador' ||
+    user?.roles?.admin === true ||
+    user?.isAdmin === true ||
+    (Array.isArray(user?.permissions) && user.permissions.includes('admin')) ||
+    (Array.isArray(user?.permissions) && user.permissions.includes('inventory.manage'));
+
+  // Logs útiles
+  console.log('[DEBUG] user →', user);
+  console.log('[DEBUG] role raw/normalized →', user?.role, '/', normalizedRole);
+  console.log('[DEBUG] canAdmin →', canAdmin);
+  console.log('[DEBUG] currentView →', currentView);
 
   const renderContent = () => {
     // Vistas navegadas directamente
@@ -228,7 +238,7 @@ function App() {
       return <ProviderManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
 
-    // Dashboards por rol
+    // Dashboards por rol (y fallback admin si canAdmin)
     switch (normalizedRole) {
       case 'restaurante':
         return (
@@ -338,6 +348,36 @@ function App() {
         );
 
       default:
+        // Si no coincidió por 'role' pero detectamos capacidades de admin, fuerza el dashboard admin (y el botón aparecerá)
+        if (canAdmin) {
+          return (
+            <div className="dashboard">
+              <h2>👑 Dashboard Administrador</h2>
+              <p>Bienvenido, <strong>{user?.name}</strong></p>
+              <p>Organización: <strong>{user?.organizationName}</strong></p>
+              <div className="dashboard-options">
+                <button className="dashboard-button" onClick={() => handleNavigation('admin-overview')}>
+                  📊 Vista General
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('inventory-control')}>
+                  📊 Gestionar Inventario
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('products')}>
+                  📦 Gestionar Productos
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('user-management')}>
+                  👥 Gestionar Usuarios
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('provider-management')}>
+                  🏪 Gestionar Proveedores
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('organization-settings')}>
+                  ⚙️ Configuración
+                </button>
+              </div>
+            </div>
+          );
+        }
         return <div>Rol no reconocido: {String(user?.role)}</div>;
     }
   };
