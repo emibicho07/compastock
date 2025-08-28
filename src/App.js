@@ -234,7 +234,7 @@ function App() {
     }
 
     if (currentView === 'admin-overview') {
-      return <AdminOverview user={user} onBack={() => setCurrentView('dashboard')} />;
+      return <AdminOverview user={user} onBack={() => setCurrentView('dashboard')} handleNavigation={handleNavigation} />;
     }
 
     if (currentView === 'user-management') {

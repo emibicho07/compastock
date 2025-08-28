@@ -5,7 +5,7 @@ import { db } from './firebase';
 import './AdminOverview.css';
 import CodeManager from './CodeManager';
 
-function AdminOverview({ user, onBack }) {
+function AdminOverview({ user, onBack, handleNavigation }) {
   const [loading, setLoading] = useState(true);
   const [showCodeManager, setShowCodeManager] = useState(false);
   const [stats, setStats] = useState({
@@ -179,6 +179,12 @@ function AdminOverview({ user, onBack }) {
     return icons[status] || '📋';
   };
 
+  const navigateToInventory = () => {
+    if (handleNavigation) {
+      handleNavigation('inventory-control');
+    }
+  };
+
   if (showCodeManager) {
     return <CodeManager user={user} onBack={() => setShowCodeManager(false)} />;
   }
@@ -198,13 +204,22 @@ function AdminOverview({ user, onBack }) {
         <button onClick={onBack} className="back-button">← Volver</button>
         <h2>📊 Vista General - {user.organizationName}</h2>
         {user.role === 'admin' && !showCodeManager && (
-          <button
-            className="back-button"
-            style={{ marginTop: '1rem', backgroundColor: '#4caf50', color: '#fff' }}
-            onClick={() => setShowCodeManager(true)}
-          >
-            ➕ Administrar Códigos
-          </button>
+          <div className="header-buttons">
+            <button
+              className="back-button"
+              style={{ marginTop: '1rem', backgroundColor: '#2196F3', color: '#fff' }}
+              onClick={navigateToInventory}
+            >
+              📊 Gestionar Inventario
+            </button>
+            <button
+              className="back-button"
+              style={{ marginTop: '1rem', backgroundColor: '#4caf50', color: '#fff' }}
+              onClick={() => setShowCodeManager(true)}
+            >
+              ➕ Administrar Códigos
+            </button>
+          </div>
         )}
       </div>
 
