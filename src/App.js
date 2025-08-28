@@ -198,6 +198,10 @@ function App() {
   };
 
   const renderContent = () => {
+    // Debug temporal
+    console.log('Current user role:', user?.role);
+    console.log('Current view:', currentView);
+    
     if (currentView === 'products') {
       return <ProductManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
