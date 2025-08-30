@@ -21,29 +21,9 @@ function AdminOverview({ user, onBack, handleNavigation }) {
   const [recentActivity, setRecentActivity] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
 
-  // MISMA LÓGICA DE ADMIN QUE EN APP.JS
-  const normalizedRole = (user?.role ?? '').toString().trim().toLowerCase();
-  const canAdmin =
-    normalizedRole === 'admin' ||
-    normalizedRole === 'administrador' ||
-    user?.roles?.admin === true ||
-    user?.isAdmin === true ||
-    (Array.isArray(user?.permissions) && user.permissions.includes('admin')) ||
-    (Array.isArray(user?.permissions) && user.permissions.includes('inventory.manage'));
-
   useEffect(() => {
     loadDashboardData();
-    
-    // Debug para verificar
-    console.log('DEBUG AdminOverview:');
-    console.log('user completo:', user);
-    console.log('user.role (raw):', user?.role);
-    console.log('normalizedRole:', normalizedRole);
-    console.log('canAdmin:', canAdmin);
-    console.log('showCodeManager:', showCodeManager);
-    console.log('handleNavigation type:', typeof handleNavigation);
-    console.log('Condición final (canAdmin && !showCodeManager):', canAdmin && !showCodeManager);
-  }, [user, showCodeManager, handleNavigation]);
+  }, []);
 
   const loadDashboardData = async () => {
     try {
@@ -224,25 +204,24 @@ function AdminOverview({ user, onBack, handleNavigation }) {
 
   return (
     <div className="admin-overview">
-      {/* DEBUG TEMPORAL - BORRAR DESPUÉS DE RESOLVER */}
-      <div style={{background: 'red', color: 'white', padding: '20px', margin: '10px', fontSize: '14px', fontFamily: 'monospace'}}>
-        <h3>DEBUG INFO:</h3>
-        <p>user.role (raw): "{user?.role}"</p>
-        <p>normalizedRole: "{normalizedRole}"</p>
-        <p>canAdmin: {String(canAdmin)}</p>
-        <p>showCodeManager: {String(showCodeManager)}</p>
-        <p>handleNavigation: {typeof handleNavigation}</p>
-        <p>Condición (canAdmin && !showCodeManager): {String(canAdmin && !showCodeManager)}</p>
-        <hr style={{margin: '10px 0'}} />
-        <p>user.roles?.admin: {String(user?.roles?.admin)}</p>
-        <p>user.isAdmin: {String(user?.isAdmin)}</p>
-        <p>user.permissions: {JSON.stringify(user?.permissions)}</p>
-      </div>
-
+      <h1 style={{color: 'red', fontSize: '30px'}}>PRUEBA - ADMIN OVERVIEW FUNCIONANDO</h1>
+      
       <div className="ao-header">
         <button onClick={onBack} className="back-button">← Volver</button>
         <h2>Vista General - {user.organizationName}</h2>
-        {canAdmin && !showCodeManager && (
+        
+        {/* Botón forzado sin condiciones */}
+        <button 
+          onClick={() => {
+            console.log('BOTÓN DE PRUEBA PRESIONADO');
+            navigateToInventory();
+          }}
+          style={{background: 'red', color: 'white', padding: '20px', margin: '10px'}}
+        >
+          BOTÓN DE PRUEBA - GESTIONAR INVENTARIO
+        </button>
+        
+        {user.role === 'admin' && !showCodeManager && (
           <div className="header-buttons">
             <button
               className="back-button"
@@ -254,20 +233,19 @@ function AdminOverview({ user, onBack, handleNavigation }) {
               }}
               onClick={navigateToInventory}
             >
-              Gestionar Inventario
+              📊 Gestionar Inventario
             </button>
             <button
               className="back-button"
               style={{ marginTop: '1rem', backgroundColor: '#4caf50', color: '#fff' }}
               onClick={() => setShowCodeManager(true)}
             >
-              Administrar Códigos
+              ➕ Administrar Códigos
             </button>
           </div>
         )}
       </div>
 
-      {/* Resto del código igual... */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon">📋</div>
@@ -304,7 +282,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
 
       <div className="charts-grid">
         <div className="chart-container">
-          <h3>Actividad de Pedidos (Últimos 7 días)</h3>
+          <h3>📈 Actividad de Pedidos (Últimos 7 días)</h3>
           <ResponsiveContainer width="100%" height={250}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -318,7 +296,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
         </div>
 
         <div className="chart-container">
-          <h3>Productos Más Solicitados</h3>
+          <h3>🔥 Productos Más Solicitados</h3>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={topProducts}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -333,7 +311,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
 
       <div className="bottom-grid">
         <div className="chart-container">
-          <h3>Estados de Pedidos</h3>
+          <h3>📊 Estados de Pedidos</h3>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie
@@ -355,7 +333,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
         </div>
 
         <div className="activity-container">
-          <h3>Actividad Reciente</h3>
+          <h3>🕒 Actividad Reciente</h3>
           <div className="activity-list">
             {recentActivity.length === 0 ? (
               <p className="no-activity">No hay actividad reciente</p>
