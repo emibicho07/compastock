@@ -21,8 +21,26 @@ function AdminOverview({ user, onBack, handleNavigation }) {
   const [recentActivity, setRecentActivity] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
 
+  // 🔥 MISMA LÓGICA DE ADMIN QUE EN APP.JS
+  const normalizedRole = (user?.role ?? '').toString().trim().toLowerCase();
+  const canAdmin =
+    normalizedRole === 'admin' ||
+    normalizedRole === 'administrador' ||
+    user?.roles?.admin === true ||
+    user?.isAdmin === true ||
+    (Array.isArray(user?.permissions) && user.permissions.includes('admin')) ||
+    (Array.isArray(user?.permissions) && user.permissions.includes('inventory.manage'));
+
   useEffect(() => {
     loadDashboardData();
+    
+    // Debug para verificar
+    console.log('🔍 DEBUG AdminOverview:');
+    console.log('user.role (raw):', user?.role);
+    console.log('normalizedRole:', normalizedRole);
+    console.log('canAdmin:', canAdmin);
+    console.log('showCodeManager:', showCodeManager);
+    console.log('handleNavigation type:', typeof handleNavigation);
   }, []);
 
   const loadDashboardData = async () => {
@@ -180,8 +198,12 @@ function AdminOverview({ user, onBack, handleNavigation }) {
   };
 
   const navigateToInventory = () => {
+    console.log('🔘 Botón de inventario presionado');
     if (handleNavigation) {
+      console.log('✅ Navegando a inventory-control');
       handleNavigation('inventory-control');
+    } else {
+      console.error('❌ handleNavigation no definido');
     }
   };
 
@@ -203,11 +225,17 @@ function AdminOverview({ user, onBack, handleNavigation }) {
       <div className="ao-header">
         <button onClick={onBack} className="back-button">← Volver</button>
         <h2>📊 Vista General - {user.organizationName}</h2>
-        {user.role === 'admin' && !showCodeManager && (
+        {/* 🔥 CAMBIO PRINCIPAL: Usar canAdmin en lugar de user.role === 'admin' */}
+        {canAdmin && !showCodeManager && (
           <div className="header-buttons">
             <button
               className="back-button"
-              style={{ marginTop: '1rem', backgroundColor: '#2196F3', color: '#fff' }}
+              style={{ 
+                marginTop: '1rem', 
+                backgroundColor: '#2196F3', 
+                color: '#fff',
+                marginRight: '0.5rem'
+              }}
               onClick={navigateToInventory}
             >
               📊 Gestionar Inventario
@@ -223,7 +251,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
         )}
       </div>
 
-      {/* Tarjetas de estadísticas */}
+      {/* Resto del código igual... */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon">📋</div>
@@ -258,9 +286,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
         </div>
       </div>
 
-      {/* Gráficas */}
       <div className="charts-grid">
-        {/* Gráfica de pedidos por día */}
         <div className="chart-container">
           <h3>📈 Actividad de Pedidos (Últimos 7 días)</h3>
           <ResponsiveContainer width="100%" height={250}>
@@ -275,7 +301,6 @@ function AdminOverview({ user, onBack, handleNavigation }) {
           </ResponsiveContainer>
         </div>
 
-        {/* Gráfica de productos más pedidos */}
         <div className="chart-container">
           <h3>🔥 Productos Más Solicitados</h3>
           <ResponsiveContainer width="100%" height={250}>
@@ -290,9 +315,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
         </div>
       </div>
 
-      {/* Estados de pedidos y actividad reciente */}
       <div className="bottom-grid">
-        {/* Gráfica de estados */}
         <div className="chart-container">
           <h3>📊 Estados de Pedidos</h3>
           <ResponsiveContainer width="100%" height={200}>
@@ -315,7 +338,6 @@ function AdminOverview({ user, onBack, handleNavigation }) {
           </ResponsiveContainer>
         </div>
 
-        {/* Actividad reciente */}
         <div className="activity-container">
           <h3>🕒 Actividad Reciente</h3>
           <div className="activity-list">
