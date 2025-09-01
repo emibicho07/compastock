@@ -25,6 +25,7 @@ function InventoryControl({ user, onBack }) {
 
   useEffect(() => {
     loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -115,7 +116,7 @@ function InventoryControl({ user, onBack }) {
       }
 
       const currentStock = stockProduct.stockLevel || 0;
-      let newStock;
+      let newStock = currentStock;
 
       if (stockData.type === 'in') {
         newStock = currentStock + quantity;
@@ -128,23 +129,26 @@ function InventoryControl({ user, onBack }) {
         }
       }
 
-      // Actualizar stock del producto
-      await updateDoc(doc(db, 'products', stockProduct.id), {
-        stockLevel: newStock,
-        lastRestockDate: stockData.type === 'in' ? new Date().toISOString() : stockProduct.lastRestockDate,
-        updatedAt: new Date().toISOString()
-      });
+      // 🔒 Solo ADMIN puede actualizar el stock directo del producto
+      if (isAdmin) {
+        await updateDoc(doc(db, 'products', stockProduct.id), {
+          stockLevel: newStock,
+          lastRestockDate: stockData.type === 'in' ? new Date().toISOString() : stockProduct.lastRestockDate,
+          updatedAt: new Date().toISOString()
+        });
+      }
 
-      // Registrar transacción
+      // 🧾 Registrar transacción SIEMPRE (admin y restaurante)
       await addDoc(collection(db, 'inventory_transactions'), {
         productId: stockProduct.id,
         productName: stockProduct.name,
         organizationId: getOrganizationId(user),
         locationId: user.restaurant || user.organizationName,
-        type: stockData.type,
+        type: stockData.type, // 'in' | 'out' (más adelante: 'waste')
         quantity: quantity,
         previousStock: currentStock,
-        newStock: newStock,
+        // Para restaurante, NO reflejamos cambio de "foto" aquí (solo histórico)
+        newStock: isAdmin ? newStock : currentStock,
         reason: stockData.reason || (stockData.type === 'in' ? 'Entrada de inventario' : 'Salida de inventario'),
         notes: stockData.notes,
         userId: user.uid,

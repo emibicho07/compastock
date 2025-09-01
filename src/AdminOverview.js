@@ -23,6 +23,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
 
   useEffect(() => {
     loadDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadDashboardData = async () => {
@@ -180,9 +181,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
   };
 
   const navigateToInventory = () => {
-    console.log('Botón de inventario presionado');
     if (handleNavigation) {
-      console.log('Navegando a inventory-control');
       handleNavigation('inventory-control');
     } else {
       console.error('handleNavigation no definido');
@@ -210,7 +209,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
         <button onClick={onBack} className="back-button">← Volver</button>
         <h2>Vista General - {user.organizationName}</h2>
         
-        {/* Botón forzado sin condiciones */}
+        {/* Botón forzado sin condiciones (debug) */}
         <button 
           onClick={() => {
             console.log('BOTÓN DE PRUEBA PRESIONADO');
@@ -221,7 +220,7 @@ function AdminOverview({ user, onBack, handleNavigation }) {
           BOTÓN DE PRUEBA - GESTIONAR INVENTARIO
         </button>
         
-        {user.role === 'admin' && !showCodeManager && (
+        {(user.role === 'admin' || user.role === 'restaurante') && !showCodeManager && (
           <div className="header-buttons">
             <button
               className="back-button"
@@ -235,13 +234,15 @@ function AdminOverview({ user, onBack, handleNavigation }) {
             >
               📊 Gestionar Inventario
             </button>
-            <button
-              className="back-button"
-              style={{ marginTop: '1rem', backgroundColor: '#4caf50', color: '#fff' }}
-              onClick={() => setShowCodeManager(true)}
-            >
-              ➕ Administrar Códigos
-            </button>
+            {user.role === 'admin' && (
+              <button
+                className="back-button"
+                style={{ marginTop: '1rem', backgroundColor: '#4caf50', color: '#fff' }}
+                onClick={() => setShowCodeManager(true)}
+              >
+                ➕ Administrar Códigos
+              </button>
+            )}
           </div>
         )}
       </div>
