@@ -1,6 +1,7 @@
+// App.js (versión robusta)
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore'; // 👈 limpiado
+import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import Login from './Login';
 import ProductManagement from './ProductManagement';
@@ -10,8 +11,12 @@ import AdminOverview from './AdminOverview';
 import UserManagement from './UserManagement';
 import OrganizationSettings from './OrganizationSettings';
 import ProviderManagement from './ProviderManagement';
+import InventoryControl from './InventoryControl';
 import EmailVerificationGate from './EmailVerificationGate';
 import './App.css';
+
+// ↓ Actívalo cuando verifiques que tu sw.js está bien en producción
+const ENABLE_SW = false;
 
 function App() {
   const [user, setUser] = useState(null);
@@ -22,12 +27,11 @@ function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
 
-  // FUNCIÓN ROBUSTA PARA CARGAR USUARIO COMPLETO (por UID + reintento)
+  // Carga robusta de usuario Firestore (por UID + reintento)
   const loadCompleteUserData = async (firebaseUser, tries = 2) => {
     try {
       const ref = doc(db, 'users', firebaseUser.uid);
       const snap = await getDoc(ref);
-
       if (snap.exists()) {
         return {
           uid: firebaseUser.uid,
@@ -36,13 +40,10 @@ function App() {
           ...snap.data(),
         };
       }
-
-      // posible carrera con setDoc() tras registro
       if (tries > 0) {
         await new Promise((r) => setTimeout(r, 400));
         return await loadCompleteUserData(firebaseUser, tries - 1);
       }
-
       console.error('[USER] No existe /users/{uid} tras reintento');
       return null;
     } catch (err) {
@@ -72,7 +73,6 @@ function App() {
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -80,24 +80,22 @@ function App() {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // PWA: Registrar Service Worker
+  // PWA: Registrar Service Worker (desactivado por defecto)
   useEffect(() => {
+    if (!ENABLE_SW) return;
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
           console.log('Service Worker registrado:', registration.scope);
-
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing;
             newWorker.addEventListener('statechange', () => {
@@ -123,15 +121,12 @@ function App() {
       setDeferredPrompt(e);
       setShowInstallPrompt(true);
     };
-
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
     window.addEventListener('appinstalled', () => {
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
       console.log('CompaStock instalado exitosamente');
     });
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
@@ -141,7 +136,6 @@ function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
-
     if (action && user) {
       switch (action) {
         case 'create-order':
@@ -159,9 +153,7 @@ function App() {
     }
   }, [user]);
 
-  const handleLogin = (userData) => {
-    setUser(userData);
-  };
+  const handleLogin = (userData) => setUser(userData);
 
   const handleLogout = async () => {
     try {
@@ -179,28 +171,39 @@ function App() {
     setViewParams(params);
   };
 
-  // PWA: Instalar app
   const handleInstallApp = async () => {
     if (!deferredPrompt) return;
-
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-
-    if (outcome === 'accepted') {
-      console.log('Usuario aceptó instalar CompaStock');
-    } else {
-      console.log('Usuario rechazó instalar CompaStock');
-    }
-
+    if (outcome === 'accepted') console.log('Usuario aceptó instalar CompaStock');
     setDeferredPrompt(null);
     setShowInstallPrompt(false);
   };
 
+  // 🔒 Normaliza rol y calcula 'canAdmin' con múltiples señales
+  const normalizedRole = (user?.role ?? '').toString().trim().toLowerCase();
+  const canAdmin =
+    normalizedRole === 'admin' ||
+    normalizedRole === 'administrador' ||
+    user?.roles?.admin === true ||
+    user?.isAdmin === true ||
+    (Array.isArray(user?.permissions) && user.permissions.includes('admin')) ||
+    (Array.isArray(user?.permissions) && user.permissions.includes('inventory.manage'));
+
+  // Logs útiles
+  console.log('[DEBUG] user →', user);
+  console.log('[DEBUG] role raw/normalized →', user?.role, '/', normalizedRole);
+  console.log('[DEBUG] canAdmin →', canAdmin);
+  console.log('[DEBUG] currentView →', currentView);
+
   const renderContent = () => {
+    // Vistas navegadas directamente
     if (currentView === 'products') {
       return <ProductManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
-
+    if (currentView === 'inventory-control') {
+      return <InventoryControl user={user} onBack={() => setCurrentView('dashboard')} />;
+    }
     if (currentView === 'restaurant-orders') {
       return (
         <RestaurantOrders
@@ -212,7 +215,6 @@ function App() {
         />
       );
     }
-
     if (currentView === 'supplier-dashboard') {
       return (
         <SupplierDashboard
@@ -223,51 +225,41 @@ function App() {
         />
       );
     }
-
     if (currentView === 'admin-overview') {
-      return <AdminOverview user={user} onBack={() => setCurrentView('dashboard')} />;
+      return <AdminOverview user={user} onBack={() => setCurrentView('dashboard')} handleNavigation={handleNavigation} />;
     }
-
     if (currentView === 'user-management') {
       return <UserManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
-
     if (currentView === 'organization-settings') {
       return <OrganizationSettings user={user} onBack={() => setCurrentView('dashboard')} />;
     }
-
     if (currentView === 'provider-management') {
       return <ProviderManagement user={user} onBack={() => setCurrentView('dashboard')} />;
     }
 
-    switch (user?.role) {
+    // Dashboards por rol (y fallback admin si canAdmin)
+    switch (normalizedRole) {
       case 'restaurante':
         return (
           <div className="dashboard">
             <h2>🍴 Dashboard Restaurante</h2>
-            <p>
-              Bienvenido, <strong>{user.name}</strong>
-            </p>
-            <p>
-              Restaurante: <strong>{user.restaurant}</strong>
-            </p>
-            <p>
-              Organización: <strong>{user.organizationName}</strong>
-            </p>
+            <p>Bienvenido, <strong>{user.name}</strong></p>
+            <p>Restaurante: <strong>{user.restaurant}</strong></p>
+            <p>Organización: <strong>{user.organizationName}</strong></p>
             <div className="dashboard-options">
               <button
                 className="dashboard-button"
-                onClick={() =>
-                  handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: false })
-                }
+                onClick={() => handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: false })}
               >
                 📝 Crear Pedido Semanal
               </button>
+              <button className="dashboard-button" onClick={() => handleNavigation('inventory-control')}>
+                📊 Ver Inventario
+              </button>
               <button
                 className="dashboard-button urgent-button"
-                onClick={() =>
-                  handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: true })
-                }
+                onClick={() => handleNavigation('restaurant-orders', { initialView: 'create', initialUrgent: true })}
               >
                 🚨 Pedido Urgente
               </button>
@@ -291,12 +283,8 @@ function App() {
         return (
           <div className="dashboard">
             <h2>🚚 Dashboard Surtidor</h2>
-            <p>
-              Bienvenido, <strong>{user.name}</strong>
-            </p>
-            <p>
-              Organización: <strong>{user.organizationName}</strong>
-            </p>
+            <p>Bienvenido, <strong>{user.name}</strong></p>
+            <p>Organización: <strong>{user.organizationName}</strong></p>
             <div className="dashboard-options">
               <button
                 className="dashboard-button"
@@ -330,18 +318,18 @@ function App() {
         );
 
       case 'admin':
+      case 'administrador':
         return (
           <div className="dashboard">
             <h2>👑 Dashboard Administrador</h2>
-            <p>
-              Bienvenido, <strong>{user.name}</strong>
-            </p>
-            <p>
-              Organización: <strong>{user.organizationName}</strong>
-            </p>
+            <p>Bienvenido, <strong>{user.name}</strong></p>
+            <p>Organización: <strong>{user.organizationName}</strong></p>
             <div className="dashboard-options">
               <button className="dashboard-button" onClick={() => handleNavigation('admin-overview')}>
                 📊 Vista General
+              </button>
+              <button className="dashboard-button" onClick={() => handleNavigation('inventory-control')}>
+                📊 Gestionar Inventario
               </button>
               <button className="dashboard-button" onClick={() => handleNavigation('products')}>
                 📦 Gestionar Productos
@@ -360,7 +348,37 @@ function App() {
         );
 
       default:
-        return <div>Rol no reconocido</div>;
+        // Si no coincidió por 'role' pero detectamos capacidades de admin, fuerza el dashboard admin (y el botón aparecerá)
+        if (canAdmin) {
+          return (
+            <div className="dashboard">
+              <h2>👑 Dashboard Administrador</h2>
+              <p>Bienvenido, <strong>{user?.name}</strong></p>
+              <p>Organización: <strong>{user?.organizationName}</strong></p>
+              <div className="dashboard-options">
+                <button className="dashboard-button" onClick={() => handleNavigation('admin-overview')}>
+                  📊 Vista General
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('inventory-control')}>
+                  📊 Gestionar Inventario
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('products')}>
+                  📦 Gestionar Productos
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('user-management')}>
+                  👥 Gestionar Usuarios
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('provider-management')}>
+                  🏪 Gestionar Proveedores
+                </button>
+                <button className="dashboard-button" onClick={() => handleNavigation('organization-settings')}>
+                  ⚙️ Configuración
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return <div>Rol no reconocido: {String(user?.role)}</div>;
     }
   };
 
@@ -386,13 +404,11 @@ function App() {
             <div className={`connection-indicator ${isOnline ? 'online' : 'offline'}`}>
               {isOnline ? '🟢' : '🔴'} {isOnline ? 'En línea' : 'Sin conexión'}
             </div>
-
             {showInstallPrompt && (
               <button onClick={handleInstallApp} className="install-button">
                 📱 Instalar App
               </button>
             )}
-
             <button onClick={handleLogout} className="logout-button">
               Cerrar Sesión
             </button>
